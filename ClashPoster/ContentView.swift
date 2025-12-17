@@ -14,7 +14,25 @@ class ClashImposterEngine: ObservableObject {
     @Published var gameState: GameMode = .setup
     
     // Ensure these match your Asset names exactly!
-    let cardPool = ["P.E.K.K.A", "Hog Rider", "The Log", "Mega Knight", "Electro Wizard", "Princess", "Sparky", "Balloon", "X-Bow", "Giant Skeleton"]
+    let cardPool = ["Archer Queen", "Archers", "Arrows", "Baby Dragon", "Balloon", "Bandit", "Barbarian Barrel",
+                    "Barbarian Hut", "Barbarians", "Bats", "Battle Healer", "Battle Ram", "Berserker", "Bomb Tower",
+                    "Bomber", "Boss Bandit", "Bowler", "Cannon", "Cannon Cart", "Clone", "Dark Prince", "Dart Goblin",
+                    "Earthquake", "Electro Dragon", "Electro Giant", "Electro Spirit", "Electro Wizard",
+                    "Elite Barbarians", "Elixir Collector", "Elixir Golem", "Executioner", "Fire Spirit",
+                    "Fireball", "Firecracker", "Fisherman", "Flying Machine", "Freeze", "Furnace", "Giant",
+                    "Giant Skeleton", "Giant Snowball", "Goblin Barrel", "Goblin Cage", "Goblin Curse",
+                    "Goblin Demolisher", "Goblin Drill", "Goblin Gang", "Goblin Giant", "Goblin Hut",
+                    "Goblin Machine", "Goblins", "Goblinstein", "Golden Knight", "Golem", "Graveyard",
+                        "Guards", "Heal Spirit", "Hog Rider", "Hunter", "Ice Golem", "Ice Spirit", "Ice Wizard",
+                        "Inferno Dragon", "Inferno Tower", "Knight", "Lava Hound", "Lightning", "Little Prince",
+                        "Lumberjack", "Magic Archer", "Mega Knight", "Mega Minion", "Mighty Miner", "Miner",
+                        "Mini P.E.K.K.A", "Minion Horde", "Minions", "Mirror", "Monk", "Mortar", "Mother Witch",
+                        "Musketeer", "Night Witch", "P.E.K.K.A", "Phoenix", "Poison", "Prince", "Princess",
+                        "Rage", "Ram Rider", "Rascals", "Rocket", "Royal Delivery", "Royal Ghost",
+                        "Royal Giant", "Royal Hogs", "Royal Recruits", "Rune Giant", "Skeleton Army", "Skeleton Barrel",
+                        "Skeleton Dragons", "Skeleton King", "Skeletons", "Sparky", "Spear Goblins", "Spirit Empress",
+                        "Suspicious Bush", "Tesla", "The Log", "Three Musketeers", "Tombstone", "Tornado", "Valkyrie",
+                        "Vines", "Void", "Wall Breakers", "Witch", "Wizard", "X-Bow", "Zap", "Zappies"]
     
     enum GameMode {
         case setup, distribution, discussion
@@ -71,20 +89,20 @@ struct ContentView: View {
     
     // --- DESIGNED SETUP SCREEN ---
     var setupView: some View {
-        VStack(spacing: 40) {
-            VStack(spacing: 5) {
-                Text("CLASH")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .tracking(8)
-                    .foregroundColor(clashGold.opacity(0.8))
+            VStack(spacing: 40) {
+                // THE NEW COMBINED TITLE
+                HStack(spacing: 0) {
+                    Text("CLASH")
+                        .font(.system(size: 38, weight: .black, design: .rounded))
+                        .foregroundColor(clashGold)
+                    
+                    Text("POSTER")
+                        .font(.system(size: 38, weight: .black, design: .rounded))
+                        .foregroundColor(.white)
+                        .shadow(color: clashGold.opacity(0.5), radius: 10, x: 0, y: 0)
+                }
+                .padding(.top, 40)
                 
-                Text("UNDERCOVER")
-                    .font(.system(size: 42, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
-                    .shadow(color: clashGold.opacity(0.5), radius: 10, x: 0, y: 0)
-            }
-            .padding(.top, 40)
-
             ZStack {
                 Circle()
                     .fill(clashGold.opacity(0.15))
@@ -174,7 +192,7 @@ struct ContentView: View {
 
     var discussionView: some View {
         VStack(spacing: 40) {
-            Text("WHO IS THE SPY?").font(.title).bold().foregroundColor(clashGold)
+            Text("WHO IS THE IMPOSTER?").font(.title).bold().foregroundColor(clashGold)
             
             Image(systemName: "magnifyingglass").font(.system(size: 80)).foregroundColor(clashGold)
 
