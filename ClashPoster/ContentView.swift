@@ -96,7 +96,7 @@ struct ContentView: View {
     
     // Header Component
     var gameHeader: some View {
-        Text("CLASH UNDERCOVER")
+        Text("CLASHPOSTER")
             .font(.system(size: 28, weight: .black, design: .rounded))
             .foregroundColor(clashGold)
             .shadow(color: .black, radius: 2, x: 1, y: 1)
