@@ -270,8 +270,8 @@ struct CardButton: View {
                             // Once you have real images in Assets, comment out the
                             // placeholder 'Image(systemName...)' line and uncomment the real line below it:
                             
-                            Image(systemName: "person.crop.square.fill") // Placeholder
-                            // Image(secretCard) // <--- REAL IMAGE CODE
+                            //Image(systemName: "person.crop.square.fill") // Placeholder
+                            Image(secretCard) // <--- REAL IMAGE CODE
                                 .resizable()
                                 .scaledToFit()
                                 .frame(height: 50)
