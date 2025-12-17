@@ -168,6 +168,7 @@ struct ContentView: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
                     ForEach(engine.players.indices, id: \.self) { index in
                         CardFlipView(player: $engine.players[index], secretCard: engine.secretCard, clashGold: clashGold)
+                            .frame(width: 140, height: 185) // increased size here
                     }
                 }
                 .padding(.horizontal, 20)
@@ -245,34 +246,46 @@ struct CardFlipView: View {
             CardFace(color: .white, border: .red) {
                 ZStack(alignment: .bottom) {
                     if player.isImposter {
-                        Image("Imposter Card")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 70)
-                            .cornerRadius(5)
-                        
-                        Text("IMPOSTER")
-                            .font(.caption)
-                            .bold()
-                            .foregroundColor(.red)
+                        VStack(spacing: 0) {
+                            Spacer(minLength: 0)
+                            Image("Imposter Card")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 108)
+                                .cornerRadius(5)
+                            Spacer(minLength: 0)
+                            Text("IMPOSTER")
+                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .foregroundColor(.white)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 18)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.red)
+                                        .shadow(color: Color.red.opacity(0.3), radius: 7, x: 0, y: 2)
+                                )
+                                .padding(.bottom, 8)
+                        }
                     }
                     else {
-                        // FULL SCALE IMAGE
-                        Image(secretCard)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .clipped()
-                        
-                        // BLACK TRANSPARENT NAMEPLATE
-                        Text(secretCard.uppercased())
-                            .font(.system(size: 11, weight: .black, design: .rounded))
-                            .foregroundColor(.white)
-                            .padding(.vertical, 8)
-                            .frame(maxWidth: .infinity)
-                            .background(
-                                LinearGradient(gradient: Gradient(colors: [.clear, .black.opacity(0.9)]), startPoint: .top, endPoint: .bottom)
-                            )
+                        VStack(spacing: 0) {
+                            Spacer(minLength: 0)
+                            Image(secretCard)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 110) // changed from 90 to 110
+                                .cornerRadius(5)
+                            Spacer(minLength: 0)
+                            Text(secretCard.uppercased())
+                                .font(.system(size: 11, weight: .black, design: .rounded))
+                                .foregroundColor(.white)
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    LinearGradient(gradient: Gradient(colors: [.clear, .black.opacity(0.9)]), startPoint: .top, endPoint: .bottom)
+                                )
+                                .padding(.bottom, 8)
+                        }
                     }
                 }
             }
@@ -333,3 +346,4 @@ struct CardFlipView: View {
         }
     }
 }
+
