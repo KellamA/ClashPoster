@@ -13,7 +13,8 @@ class ClashImposterEngine: ObservableObject {
     @Published var secretCard: String = ""
     @Published var gameState: GameMode = .setup
     
-    // You can add more Clash cards here!
+    // IMPORTANT: To use real images, ensure the image filenames in your
+    // Assets folder match these strings EXACTLY.
     let cardPool = ["Archer Queen", "Archers", "Arrows", "Baby Dragon", "Balloon", "Bandit", "Barbarian Barrel",
                     "Barbarian Hut", "Barbarians", "Bats", "Battle Healer", "Battle Ram", "Berserker", "Bomb Tower",
                     "Bomber", "Boss Bandit", "Bowler", "Cannon", "Cannon Cart", "Clone", "Dark Prince", "Dart Goblin",
@@ -61,69 +62,117 @@ struct ContentView: View {
     @State private var showAlert = false
     @State private var alertContent = ""
     
+    // Define themed colors
+    let clashBlue = Color(red: 0.1, green: 0.2, blue: 0.5)
+    let clashGold = Color(red: 1.0, green: 0.8, blue: 0.2)
+    
     var body: some View {
         NavigationView {
-            VStack {
-                if engine.gameState == .setup {
-                    setupView
-                } else if engine.gameState == .distribution {
-                    distributionView
-                } else {
-                    discussionView
+            ZStack {
+                // --- THE BACKGROUND ---
+                // A dark gradient to give it an arena feel
+                LinearGradient(gradient: Gradient(colors: [clashBlue, .black]), startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .ignoresSafeArea()
+                
+                // --- THE CONTENT ---
+                VStack {
+                    if engine.gameState == .setup {
+                        setupView
+                    } else if engine.gameState == .distribution {
+                        distributionView
+                    } else {
+                        discussionView
+                    }
                 }
+                .padding()
             }
-            .navigationTitle("Clash Undercover")
-            .padding()
+            .navigationTitle("") // Hiding default title to use custom header
+            .navigationBarHidden(true)
         }
+        // Setting the text color for the whole app to white for contrast
+        .foregroundColor(.white)
+        .preferredColorScheme(.dark)
+    }
+    
+    // Header Component
+    var gameHeader: some View {
+        Text("CLASH UNDERCOVER")
+            .font(.system(size: 28, weight: .black, design: .rounded))
+            .foregroundColor(clashGold)
+            .shadow(color: .black, radius: 2, x: 1, y: 1)
+            .padding(.bottom, 20)
     }
     
     // Setup Screen
     var setupView: some View {
-        VStack(spacing: 20) {
-            Image("mysteriousKingNB")
-                .resizable()
-                .scaledToFit()
-                .frame(height: 160)
-                .padding(.bottom, 10)
-
+        VStack(spacing: 30) {
+            gameHeader
             
-            Text("How many players?")
-                .font(.headline)
-            
-            Stepper("\(playerCount) Players", value: $playerCount, in: 3...10)
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(10)
-            
-            Button("START GAME") {
-                engine.startGame(playerCount: playerCount)
+            VStack(spacing: 10) {
+                Image(systemName: "shield.checkered")
+                    .font(.system(size: 80))
+                    .foregroundColor(clashGold)
+                    .shadow(radius: 5)
+                Text("Assemble Your Clan")
+                    .font(.title2)
+                    .fontWeight(.bold)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            
+            VStack {
+                Text("Players: \(playerCount)")
+                    .font(.headline)
+                Stepper("", value: $playerCount, in: 3...10)
+                    .labelsHidden()
+                    .padding()
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(15)
+            }
+            .padding()
+            
+            Button(action: { engine.startGame(playerCount: playerCount) }) {
+                Text("START BATTLE")
+                    .font(.title3).bold()
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(clashGold)
+                    .foregroundColor(.black)
+                    .cornerRadius(15)
+                    .shadow(radius: 5)
+            }
         }
+        .padding()
     }
     
     // Passing the phone screen
     var distributionView: some View {
         VStack {
-            Text("Pass the phone around.\nTap your card to see your role.")
+            gameHeader
+            
+            Text("Tap a card to reveal your role.\nTap again to lock it and pass the phone.")
                 .multilineTextAlignment(.center)
-                .padding()
+                .font(.callout)
+                .padding(.bottom)
             
             ScrollView {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())]) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 15) {
                     ForEach(engine.players.indices, id: \.self) { index in
-                        CardButton(player: $engine.players[index], secretCard: engine.secretCard)
+                        CardButton(player: $engine.players[index], secretCard: engine.secretCard, clashGold: clashGold)
                     }
                 }
+                .padding(.horizontal)
             }
             
             if engine.players.allSatisfy({ $0.hasSeenRole }) {
-                Button("START DISCUSSION") {
-                    engine.gameState = .discussion
+                Button(action: { engine.gameState = .discussion }) {
+                    Text("BEGIN DISCUSSION")
+                        .bold()
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(15)
+                        .shadow(radius: 5)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.green)
                 .padding()
             }
         }
@@ -132,11 +181,22 @@ struct ContentView: View {
     // The "Who is it?" screen
     var discussionView: some View {
         VStack(spacing: 30) {
-            Text("BATTLE COMMENCED")
-                .font(.title).bold()
+            gameHeader
             
-            Text("The Imposter does NOT know the card. Take turns describing it!")
-                .multilineTextAlignment(.center)
+            VStack(spacing: 20) {
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(clashGold)
+                
+                Text("Discuss!")
+                    .font(.title).bold()
+                
+                Text("The Imposter does NOT know the card.\nDescribe the card, but don't give it away!")
+                    .multilineTextAlignment(.center)
+                    .padding()
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(15)
+            }
             
             Spacer()
             
@@ -145,7 +205,8 @@ struct ContentView: View {
                 alertContent = "Player \(imposter?.index ?? 0) was the Imposter!"
                 showAlert = true
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.borderedProminent)
+            .tint(clashBlue)
             
             Button("New Game") {
                 engine.reset()
@@ -158,75 +219,101 @@ struct ContentView: View {
     }
 }
 
-// --- UPDATED CARD COMPONENT WITH ANTI-CHEAT ---
+// --- 3. THE CARD COMPONENT (VISUAL UPDATE) ---
 struct CardButton: View {
     @Binding var player: Player
     var secretCard: String
+    var clashGold: Color // Passed in color
     
-    // Track 3 states: 0 = Hidden, 1 = Showing, 2 = Locked
+    // 0 = Hidden, 1 = Showing, 2 = Locked
     @State private var viewStep = 0
     
     var body: some View {
         Button(action: {
-            if viewStep == 0 {
-                // First tap: Show the card
-                viewStep = 1
-                player.hasSeenRole = true
-            } else if viewStep == 1 {
-                // Second tap: Hide and lock forever
-                viewStep = 2
+            withAnimation(.easeInOut(duration: 0.3)) {
+                if viewStep == 0 { viewStep = 1; player.hasSeenRole = true }
+                else if viewStep == 1 { viewStep = 2 }
             }
         }) {
             ZStack {
+                // Card Background
                 RoundedRectangle(cornerRadius: 15)
-                    .fill(cardColor)
+                    .fill(cardBgColor)
                     .overlay(
                         RoundedRectangle(cornerRadius: 15)
-                            .stroke(Color.black.opacity(0.1), lineWidth: 2)
+                            .stroke(cardBorderColor, lineWidth: 3)
                     )
-                    .shadow(radius: viewStep == 2 ? 0 : 3)
+                    .shadow(color: .black.opacity(0.5), radius: viewStep == 2 ? 0 : 5, x: 0, y: 5)
                 
-                VStack(spacing: 8) {
+                // Card Content
+                VStack(spacing: 10) {
                     if viewStep == 0 {
-                        // STATE: HIDDEN
-                        Text("Player \(player.index)")
+                        // HIDDEN STATE
+                        Image(systemName: "shield.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(clashGold)
+                        Text("PLAYER \(player.index)")
+                            .font(.headline)
+                            .fontWeight(.heavy)
                             .foregroundColor(.white)
-                            .bold()
-                        Text("Tap to Reveal")
-                            .font(.caption2)
-                            .foregroundColor(.white.opacity(0.8))
                             
                     } else if viewStep == 1 {
-                        // STATE: SHOWING
-                        Text(player.isImposter ? "???" : secretCard)
-                            .font(.headline)
-                            .foregroundColor(.black)
-                        Text("Tap to Hide")
-                            .font(.caption2)
-                            .foregroundColor(.red)
+                        // REVEALED STATE
+                        if player.isImposter {
+                            Image(systemName: "questionmark.circle.fill")
+                                .resizable().scaledToFit().frame(height: 50)
+                                .foregroundColor(.red)
+                            Text("???").font(.headline).bold()
+                            Text("IMPOSTER").font(.caption2).bold().foregroundColor(.red)
+                        } else {
+                            // --- IMAGE REPLACEMENT AREA ---
+                            // Once you have real images in Assets, comment out the
+                            // placeholder 'Image(systemName...)' line and uncomment the real line below it:
                             
+                            Image(systemName: "person.crop.square.fill") // Placeholder
+                            // Image(secretCard) // <--- REAL IMAGE CODE
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 50)
+                                .cornerRadius(8)
+
+                            Text(secretCard)
+                                .font(.headline).bold()
+                                .multilineTextAlignment(.center)
+                                .foregroundColor(.black)
+                        }
+
                     } else {
-                        // STATE: LOCKED
+                        // LOCKED STATE
                         Image(systemName: "lock.fill")
-                            .foregroundColor(.gray)
-                        Text("PLAYER \(player.index)")
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                            .font(.system(size: 30))
+                            .foregroundColor(.gray.opacity(0.7))
+                        Text("LOCKED")
+                            .font(.caption).bold()
+                            .foregroundColor(.gray.opacity(0.7))
                     }
                 }
+                .padding(5)
             }
-            .frame(height: 100)
-            .padding(5)
+            // Fixed height ensures they all look uniform in the grid
+            .frame(height: 130)
         }
-        .disabled(viewStep == 2) // Disable the button entirely once locked
+        .disabled(viewStep == 2)
     }
     
-    // Helper to change color based on state
-    var cardColor: Color {
+    var cardBgColor: Color {
         switch viewStep {
-        case 0: return .blue
-        case 1: return .white
-        default: return Color.gray.opacity(0.2)
+        case 0: return Color(red: 0.2, green: 0.3, blue: 0.6) // Dark Blue
+        case 1: return Color.white // White for reveal
+        default: return Color.black.opacity(0.5) // Dark gray for locked
+        }
+    }
+    
+    var cardBorderColor: Color {
+        switch viewStep {
+        case 0: return clashGold
+        case 1: return Color.red
+        default: return Color.gray
         }
     }
 }
