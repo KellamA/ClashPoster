@@ -91,10 +91,6 @@ struct ContentView: View {
                     .frame(width: 160, height: 160)
                     .blur(radius: 20)
                 
-                Circle()
-                    .stroke(clashGold.opacity(0.3), lineWidth: 2)
-                    .frame(width: 140, height: 140)
-                
                 Image(systemName: "crown.fill")
                     .font(.system(size: 70))
                     .foregroundColor(clashGold)
@@ -114,7 +110,7 @@ struct ContentView: View {
                         .font(.system(size: 54, weight: .black, design: .rounded))
                         .frame(width: 70)
                     
-                    Button(action: { if playerCount < 10 { playerCount += 1 } }) {
+                    Button(action: { if playerCount < 12 { playerCount += 1 } }) {
                         Image(systemName: "plus.circle.fill").font(.largeTitle).foregroundColor(clashGold)
                     }
                 }
@@ -141,25 +137,37 @@ struct ContentView: View {
         }
     }
     
+    // --- 2-COLUMN DISTRIBUTION VIEW ---
     var distributionView: some View {
         VStack {
-            Text("TAP TO FLIP").font(.headline).foregroundColor(clashGold).padding(.top)
+            Text("PASS THE PHONE")
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundColor(clashGold)
+                .padding(.top)
             
             ScrollView {
+                // REVERTED TO 2 COLUMNS
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
                     ForEach(engine.players.indices, id: \.self) { index in
                         CardFlipView(player: $engine.players[index], secretCard: engine.secretCard, clashGold: clashGold)
                     }
                 }
-                .padding()
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
             }
             
             if engine.players.allSatisfy({ $0.hasSeenRole }) {
                 Button(action: { engine.gameState = .discussion }) {
                     Text("BEGIN BATTLE")
-                        .bold().frame(maxWidth: .infinity).padding().background(Color.green).cornerRadius(15)
+                        .font(.headline).bold()
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(15)
                 }
-                .padding()
+                .padding(.horizontal, 40)
+                .padding(.bottom, 20)
             }
         }
     }
@@ -170,7 +178,7 @@ struct ContentView: View {
             
             Image(systemName: "magnifyingglass").font(.system(size: 80)).foregroundColor(clashGold)
 
-            Text("The Imposter is trying to blend in.\nAsk questions, find the traitor!")
+            Text("The Imposter is trying to blend in.\nDescribe the card, find the traitor!")
                 .multilineTextAlignment(.center).padding().background(Color.white.opacity(0.1)).cornerRadius(15)
             
             Spacer()
@@ -202,64 +210,86 @@ struct CardFlipView: View {
 
     var body: some View {
         ZStack {
-            // BACK OF CARD (Hidden State)
+            // BACK FACE
             CardFace(color: Color(red: 0.1, green: 0.2, blue: 0.4), border: clashGold) {
-                VStack {
-                    Image(systemName: "shield.fill").font(.largeTitle).foregroundColor(clashGold)
-                    Text("PLAYER \(player.index)").font(.caption).bold().foregroundColor(.white)
+                VStack(spacing: 8) {
+                    Image(systemName: "shield.fill")
+                        .font(.system(size: 35))
+                        .foregroundColor(clashGold)
+                    Text("PLAYER \(player.index)")
+                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .foregroundColor(.white)
                 }
             }
             .opacity(isFlipped ? 0 : 1)
 
-            // FRONT OF CARD (Revealed State)
+            // FRONT FACE (LARGE IMAGE WITH DARK NAMEPLATE)
             CardFace(color: .white, border: .red) {
-                VStack {
+                ZStack(alignment: .bottom) {
                     if player.isImposter {
-                        Image(systemName: "questionmark.circle.fill").resizable().frame(width: 50, height: 50).foregroundColor(.red)
-                        Text("IMPOSTER").font(.caption).bold().foregroundColor(.red)
+                        VStack {
+                            Image(systemName: "questionmark.circle.fill")
+                                .resizable().scaledToFit().frame(width: 60)
+                                .foregroundColor(.red)
+                            Text("IMPOSTER")
+                                .font(.system(size: 14, weight: .black, design: .rounded))
+                                .foregroundColor(.red)
+                        }
                     } else {
-                        Image(secretCard) // Load from Assets
-                            .resizable().scaledToFit().frame(height: 70).cornerRadius(5)
-                        Text(secretCard).font(.caption).bold().foregroundColor(.black).multilineTextAlignment(.center)
+                        // FULL SCALE IMAGE
+                        Image(secretCard)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+                        
+                        // BLACK TRANSPARENT NAMEPLATE
+                        Text(secretCard.uppercased())
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                LinearGradient(gradient: Gradient(colors: [.clear, .black.opacity(0.9)]), startPoint: .top, endPoint: .bottom)
+                            )
                     }
                 }
             }
             .opacity(isFlipped ? 1 : 0)
             .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
 
-            // OVERLAY: LOCKED STATE
             if isLocked {
                 RoundedRectangle(cornerRadius: 15)
-                    .fill(Color.black.opacity(0.8))
-                    .overlay(Image(systemName: "lock.fill").foregroundColor(.gray))
+                    .fill(Color.black.opacity(0.85))
+                    .overlay(
+                        VStack(spacing: 5) {
+                            Image(systemName: "lock.fill").font(.title3).foregroundColor(.gray)
+                            Text("LOCKED").font(.caption2).bold().foregroundColor(.gray)
+                        }
+                    )
             }
         }
         .aspectRatio(0.75, contentMode: .fit)
         .rotation3DEffect(.degrees(degree), axis: (x: 0, y: 1, z: 0))
-        .onTapGesture {
-            flipCard()
-        }
+        .onTapGesture { flipCard() }
         .disabled(isLocked)
     }
 
     func flipCard() {
         if !isFlipped {
-            // Flip to see role
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 degree += 180
                 isFlipped = true
                 player.hasSeenRole = true
             }
         } else {
-            // Flip back and lock
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 degree += 180
                 isFlipped = false
             }
-            // Small delay to let the flip finish before locking
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                isLocked = true
-            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { isLocked = true }
         }
     }
 }
@@ -272,9 +302,12 @@ struct CardFace<Content: View>: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 15).fill(color)
-            RoundedRectangle(cornerRadius: 15).stroke(border, lineWidth: 3)
+            RoundedRectangle(cornerRadius: 15)
+                .fill(color)
             content()
+            RoundedRectangle(cornerRadius: 15)
+                .strokeBorder(border, lineWidth: 4)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 15))
     }
 }
