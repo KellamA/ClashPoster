@@ -155,37 +155,75 @@ struct ContentView: View {
     }
 }
 
-// --- 3. THE CARD COMPONENT ---
+// --- UPDATED CARD COMPONENT WITH ANTI-CHEAT ---
 struct CardButton: View {
     @Binding var player: Player
     var secretCard: String
-    @State private var isFlipped = false
+    
+    // Track 3 states: 0 = Hidden, 1 = Showing, 2 = Locked
+    @State private var viewStep = 0
     
     var body: some View {
         Button(action: {
-            isFlipped.toggle()
-            player.hasSeenRole = true
+            if viewStep == 0 {
+                // First tap: Show the card
+                viewStep = 1
+                player.hasSeenRole = true
+            } else if viewStep == 1 {
+                // Second tap: Hide and lock forever
+                viewStep = 2
+            }
         }) {
             ZStack {
                 RoundedRectangle(cornerRadius: 15)
-                    .fill(isFlipped ? Color.white : Color.blue)
+                    .fill(cardColor)
                     .overlay(
                         RoundedRectangle(cornerRadius: 15)
-                            .stroke(Color.black.opacity(0.2), lineWidth: 2)
+                            .stroke(Color.black.opacity(0.1), lineWidth: 2)
                     )
+                    .shadow(radius: viewStep == 2 ? 0 : 3)
                 
-                if isFlipped {
-                    Text(player.isImposter ? "???" : secretCard)
-                        .font(.headline)
-                        .foregroundColor(.black)
-                } else {
-                    Text("Player \(player.index)")
-                        .foregroundColor(.white)
-                        .bold()
+                VStack(spacing: 8) {
+                    if viewStep == 0 {
+                        // STATE: HIDDEN
+                        Text("Player \(player.index)")
+                            .foregroundColor(.white)
+                            .bold()
+                        Text("Tap to Reveal")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.8))
+                            
+                    } else if viewStep == 1 {
+                        // STATE: SHOWING
+                        Text(player.isImposter ? "???" : secretCard)
+                            .font(.headline)
+                            .foregroundColor(.black)
+                        Text("Tap to Hide")
+                            .font(.caption2)
+                            .foregroundColor(.red)
+                            
+                    } else {
+                        // STATE: LOCKED
+                        Image(systemName: "lock.fill")
+                            .foregroundColor(.gray)
+                        Text("PLAYER \(player.index)")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
                 }
             }
             .frame(height: 100)
             .padding(5)
+        }
+        .disabled(viewStep == 2) // Disable the button entirely once locked
+    }
+    
+    // Helper to change color based on state
+    var cardColor: Color {
+        switch viewStep {
+        case 0: return .blue
+        case 1: return .white
+        default: return Color.gray.opacity(0.2)
         }
     }
 }
