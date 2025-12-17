@@ -58,8 +58,7 @@ class ClashImposterEngine: ObservableObject {
 struct ContentView: View {
     @StateObject private var engine = ClashImposterEngine()
     @State private var playerCount = 4
-    @State private var showAlert = false
-    @State private var alertContent = ""
+    @State private var showRevealScreen = false
     
     let clashBlue = Color(red: 0.05, green: 0.1, blue: 0.25)
     let clashGold = Color(red: 1.0, green: 0.8, blue: 0.2)
@@ -85,6 +84,7 @@ struct ContentView: View {
             .navigationBarHidden(true)
         }
         .preferredColorScheme(.dark)
+        .overlay(revealView)
     }
     
     // --- DESIGNED SETUP SCREEN ---
@@ -203,16 +203,50 @@ struct ContentView: View {
             Spacer()
             
             Button("REVEAL IMPOSTER") {
-                let imposter = engine.players.first(where: { $0.isImposter })
-                alertContent = "Player \(imposter?.index ?? 0) was the Imposter!"
-                showAlert = true
+                showRevealScreen = true
             }
             .buttonStyle(.borderedProminent).tint(clashGold).foregroundColor(.black)
             
             Button("New Game") { engine.reset() }.tint(.red)
         }
-        .alert(alertContent, isPresented: $showAlert) {
-            Button("OK", role: .cancel) { engine.reset() }
+    }
+    
+    private var revealView: some View {
+        Group {
+            if showRevealScreen {
+                ZStack {
+                    Color.black.opacity(0.93).ignoresSafeArea()
+                    VStack(spacing: 28) {
+                        Text("IMPOSTER REVEAL")
+                            .font(.largeTitle).bold().foregroundColor(clashGold)
+                        let imposter = engine.players.first(where: { $0.isImposter })
+                        if let imposter {
+                            VStack(spacing: 10) {
+                                Text("Player \(imposter.index)").font(.title3).foregroundColor(.red).bold()
+                                Image("Imposter Card").resizable().scaledToFit().frame(height: 90).shadow(radius: 8)
+                                Text("IMPOSTER").font(.headline).foregroundColor(.white)
+                            }.padding().background(RoundedRectangle(cornerRadius: 18).fill(Color.red.opacity(0.25)))
+                        }
+                        Text("Other Players' Cards:").font(.headline).foregroundColor(.white)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 18) {
+                                ForEach(engine.players.filter { !$0.isImposter }, id: \.id) { player in
+                                    VStack(spacing: 7) {
+                                        Image(engine.secretCard).resizable().scaledToFit().frame(height: 70).cornerRadius(8)
+                                        Text("Player \(player.index)").font(.subheadline).foregroundColor(.gray)
+                                    }.padding(8).background(RoundedRectangle(cornerRadius: 13).fill(Color.white.opacity(0.13)))
+                                }
+                            }
+                        }.padding(.horizontal)
+                        Button(action: { showRevealScreen = false; engine.reset() }) {
+                            Text("Start New Game").font(.title3).bold().padding(.vertical, 14).padding(.horizontal, 44).background(RoundedRectangle(cornerRadius: 20).fill(clashGold)).foregroundColor(.black)
+                        }.padding(.top, 14)
+                    }
+                    .padding(36)
+                }
+                .transition(.opacity)
+                .zIndex(10)
+            }
         }
     }
 }
