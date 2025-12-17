@@ -225,7 +225,7 @@ struct CardFlipView: View {
     @State private var degree: Double = 0
     @State private var isFlipped: Bool = false
     @State private var isLocked: Bool = false
-
+    
     var body: some View {
         ZStack {
             // BACK FACE
@@ -240,20 +240,23 @@ struct CardFlipView: View {
                 }
             }
             .opacity(isFlipped ? 0 : 1)
-
+            
             // FRONT FACE (LARGE IMAGE WITH DARK NAMEPLATE)
             CardFace(color: .white, border: .red) {
                 ZStack(alignment: .bottom) {
                     if player.isImposter {
-                        VStack {
-                            Image(systemName: "questionmark.circle.fill")
-                                .resizable().scaledToFit().frame(width: 60)
-                                .foregroundColor(.red)
-                            Text("IMPOSTER")
-                                .font(.system(size: 14, weight: .black, design: .rounded))
-                                .foregroundColor(.red)
-                        }
-                    } else {
+                        Image("Imposter Card")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 70)
+                            .cornerRadius(5)
+                        
+                        Text("IMPOSTER")
+                            .font(.caption)
+                            .bold()
+                            .foregroundColor(.red)
+                    }
+                    else {
                         // FULL SCALE IMAGE
                         Image(secretCard)
                             .resizable()
@@ -275,7 +278,7 @@ struct CardFlipView: View {
             }
             .opacity(isFlipped ? 1 : 0)
             .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-
+            
             if isLocked {
                 RoundedRectangle(cornerRadius: 15)
                     .fill(Color.black.opacity(0.85))
@@ -292,7 +295,7 @@ struct CardFlipView: View {
         .onTapGesture { flipCard() }
         .disabled(isLocked)
     }
-
+    
     func flipCard() {
         if !isFlipped {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -310,22 +313,23 @@ struct CardFlipView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { isLocked = true }
         }
     }
-}
-
-// Helper view for Card Faces
-struct CardFace<Content: View>: View {
-    let color: Color
-    let border: Color
-    let content: () -> Content
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 15)
-                .fill(color)
-            content()
-            RoundedRectangle(cornerRadius: 15)
-                .strokeBorder(border, lineWidth: 4)
+    
+    
+    // Helper view for Card Faces
+    struct CardFace<Content: View>: View {
+        let color: Color
+        let border: Color
+        let content: () -> Content
+        
+        var body: some View {
+            ZStack {
+                RoundedRectangle(cornerRadius: 15)
+                    .fill(color)
+                content()
+                RoundedRectangle(cornerRadius: 15)
+                    .strokeBorder(border, lineWidth: 4)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 15))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 15))
     }
 }
