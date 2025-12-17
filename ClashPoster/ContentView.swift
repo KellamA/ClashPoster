@@ -80,9 +80,12 @@ struct ContentView: View {
     // Setup Screen
     var setupView: some View {
         VStack(spacing: 20) {
-            Image(systemName: "person.3.sequence.fill")
-                .font(.system(size: 80))
-                .foregroundColor(.blue)
+            Image("mysteriousKingNB")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 160)
+                .padding(.bottom, 10)
+
             
             Text("How many players?")
                 .font(.headline)
