@@ -1,6 +1,8 @@
 import SwiftUI
 import Foundation
 
+let warmWhite: Color = Color(red: 1.0, green: 0.96, blue: 0.85)
+
 // --- 1. DATA MODELS & LOGIC ---
 struct Player: Identifiable {
     let id = UUID()
@@ -102,13 +104,19 @@ struct ContentView: View {
     
     let clashBlue = Color(red: 0.05, green: 0.1, blue: 0.25)
     let clashGold = Color(red: 1.0, green: 0.8, blue: 0.2)
+    let lightBlue = Color(red: 0.40, green: 0.60, blue: 0.95)
+    let darkBlue = Color(red: 0.12, green: 0.22, blue: 0.55)
+    // Removed duplicate warmWhite definition here
     
     var body: some View {
         NavigationView {
             ZStack {
-                // Premium Arena Background
-                LinearGradient(gradient: Gradient(colors: [clashBlue, .black]), startPoint: .top, endPoint: .bottom)
-                    .ignoresSafeArea()
+                // Replaced CheckerboardBackground with super dark blue vertical gradient
+                LinearGradient(gradient: Gradient(colors: [
+                    Color(red: 0.02, green: 0.08, blue: 0.25), // top richer blue
+                    Color(red: 0.00, green: 0.02, blue: 0.12)  // bottom deep blue
+                ]), startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
                 
                 VStack {
                     if engine.gameState == .setup {
@@ -142,7 +150,7 @@ struct ContentView: View {
                     
                     Text("POSTER")
                         .font(.system(size: 38, weight: .black, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(warmWhite)
                         .shadow(color: clashGold.opacity(0.5), radius: 10, x: 0, y: 0)
                 }
                 .padding(.top, 40)
@@ -314,6 +322,7 @@ struct ContentView: View {
             Image(systemName: "magnifyingglass").font(.system(size: 80)).foregroundColor(clashGold)
 
             Text("The Imposter is trying to blend in.\nDescribe the card, find the traitor!")
+                .foregroundColor(warmWhite)
                 .multilineTextAlignment(.center).padding().background(Color.white.opacity(0.1)).cornerRadius(15)
             
             Spacer()
@@ -329,15 +338,18 @@ struct ContentView: View {
     
     var celebrationView: some View {
         ZStack {
-            // Minimalist celebration background
-            LinearGradient(gradient: Gradient(colors: [Color.black, Color(red: 0.1, green: 0.15, blue: 0.3)]), startPoint: .topLeading, endPoint: .bottomTrailing)
-                .ignoresSafeArea()
-                .overlay(
-                    ZStack {
-                        Circle().fill(clashGold.opacity(0.15)).frame(width: 220, height: 220).blur(radius: 40).offset(x: -120, y: -180)
-                        Circle().fill(Color.white.opacity(0.06)).frame(width: 260, height: 260).blur(radius: 50).offset(x: 140, y: 160)
-                    }
-                )
+            // Replaced CheckerboardBackground with super dark blue vertical gradient
+            LinearGradient(gradient: Gradient(colors: [
+                Color(red: 0.02, green: 0.08, blue: 0.25),
+                Color(red: 0.00, green: 0.02, blue: 0.12)
+            ]), startPoint: .top, endPoint: .bottom)
+            .ignoresSafeArea()
+            .overlay(
+                ZStack {
+                    Circle().fill(clashGold.opacity(0.15)).frame(width: 220, height: 220).blur(radius: 40).offset(x: -120, y: -180)
+                    Circle().fill(Color.white.opacity(0.06)).frame(width: 260, height: 260).blur(radius: 50).offset(x: 140, y: 160)
+                }
+            )
             VStack(spacing: 24) {
                 Text("🏆").font(.system(size: 54))
                 if engine.recentWinners.count == 1 {
@@ -347,7 +359,7 @@ struct ContentView: View {
                     VStack(spacing: 8) {
                         Text("Winners!").font(.title).bold().foregroundColor(clashGold)
                         ForEach(engine.recentWinners, id: \.id) { p in
-                            Text(p.name).font(.title3).foregroundColor(.white)
+                            Text(p.name).font(.title3).foregroundColor(warmWhite)
                         }
                     }
                 }
@@ -482,7 +494,7 @@ struct CardFlipView: View {
                         .foregroundColor(clashGold)
                     Text(player.name.uppercased())
                         .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(warmWhite)
                 }
             }
             .opacity(isFlipped ? 0 : 1)
@@ -499,6 +511,7 @@ struct CardFlipView: View {
                                 Spacer()
                             }
                             .padding(.top, 6)
+                            .padding(.leading, 6)
                             Spacer(minLength: 0)
                             Image("Imposter Card")
                                 .resizable()
@@ -528,6 +541,7 @@ struct CardFlipView: View {
                                 Spacer()
                             }
                             .padding(.top, 6)
+                            .padding(.leading, 6)
                             Spacer(minLength: 0)
                             Image(secretCard)
                                 .resizable()
@@ -537,7 +551,7 @@ struct CardFlipView: View {
                             Spacer(minLength: 0)
                             Text(secretCard.uppercased())
                                 .font(.system(size: 11, weight: .black, design: .rounded))
-                                .foregroundColor(.white)
+                                .foregroundColor(warmWhite)
                                 .padding(.vertical, 8)
                                 .frame(maxWidth: .infinity)
                                 .background(
@@ -659,6 +673,88 @@ struct CardFlipView: View {
             .background(Circle().fill(Color.black.opacity(0.5)))
             .clipShape(Circle())
             .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0)
+        }
+    }
+}
+
+// New reusable checkerboard background view
+struct CheckerboardBackground: View {
+    let color1: Color
+    let color2: Color
+    let squareSize: CGFloat
+
+    init(color1: Color, color2: Color, squareSize: CGFloat = 56) {
+        self.color1 = color1
+        self.color2 = color2
+        self.squareSize = squareSize
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let cols = Int(ceil(geo.size.width / squareSize))
+            let rows = Int(ceil(geo.size.height / squareSize))
+            ZStack {
+                // Base checker pattern with beveled squares
+                Canvas { context, size in
+                    for row in 0..<rows {
+                        for col in 0..<cols {
+                            let isAlt = (row + col) % 2 == 0
+                            let base = isAlt ? color1 : color2
+                            let rect = CGRect(x: CGFloat(col) * squareSize,
+                                              y: CGFloat(row) * squareSize,
+                                              width: squareSize,
+                                              height: squareSize)
+
+                            // Fill base
+                            context.fill(Path(rect), with: .color(base))
+
+                            // Add a subtle inner bevel: light highlight on top/left, shadow on bottom/right
+                            let highlight = Color.white.opacity(0.18)
+                            let shadow = Color.black.opacity(0.25)
+
+                            // Top edge highlight
+                            let topRect = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: 1.0)
+                            context.fill(Path(topRect), with: .color(highlight))
+                            // Left edge highlight
+                            let leftRect = CGRect(x: rect.minX, y: rect.minY, width: 1.0, height: rect.height)
+                            context.fill(Path(leftRect), with: .color(highlight))
+
+                            // Bottom edge shadow
+                            let bottomRect = CGRect(x: rect.minX, y: rect.maxY - 1.0, width: rect.width, height: 1.0)
+                            context.fill(Path(bottomRect), with: .color(shadow))
+                            // Right edge shadow
+                            let rightRect = CGRect(x: rect.maxX - 1.0, y: rect.minY, width: 1.0, height: rect.height)
+                            context.fill(Path(rightRect), with: .color(shadow))
+
+                            // Soft vignette inside square to add depth
+                            let insetRect = rect.insetBy(dx: 2, dy: 2)
+                            let endR = min(insetRect.width, insetRect.height) * 0.7
+                            let center = CGPoint(x: insetRect.midX, y: insetRect.midY)
+                            let radial = GraphicsContext.Shading.radialGradient(
+                                Gradient(colors: [Color.black.opacity(0.10), Color.clear]),
+                                center: center,
+                                startRadius: 0,
+                                endRadius: endR
+                            )
+                            context.fill(Path(insetRect), with: radial)
+                        }
+                    }
+                }
+                .ignoresSafeArea()
+
+                // Global vertical gradient over the checkerboard to add depth and unify the palette
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.black.opacity(0.22),
+                        Color.clear,
+                        Color.white.opacity(0.12)
+                    ]),
+                    startPoint: .bottom,
+                    endPoint: .top
+                )
+                .blendMode(.overlay)
+                .ignoresSafeArea()
+            }
         }
     }
 }
