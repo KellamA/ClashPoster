@@ -8,12 +8,14 @@ struct Player: Identifiable {
     var isImposter: Bool = false
     var hasSeenRole: Bool = false
     var name: String
+    var wins: Int = 0
 }
 
 class ClashImposterEngine: ObservableObject {
     @Published var players: [Player] = []
     @Published var secretCard: String = ""
     @Published var gameState: GameMode = .setup
+    @Published var recentWinners: [Player] = []
     static let savedNamesKey = "savedPlayerNames"
     
     // Ensure these match your Asset names exactly!
@@ -38,16 +40,25 @@ class ClashImposterEngine: ObservableObject {
                         "Vines", "Void", "Wall Breakers", "Witch", "Wizard", "X-Bow", "Zap", "Zappies"]
     
     enum GameMode {
-        case setup, nameEntry, distribution, discussion
+        case setup, nameEntry, distribution, discussion, celebration
     }
     
     func startGame(playerCount: Int, requiresNameEntry: Bool) {
         let imposterIndex = Int.random(in: 0..<playerCount)
         secretCard = cardPool.randomElement() ?? "P.E.K.K.A"
         
-        players = (0..<playerCount).map { i in
-            Player(index: i + 1, isImposter: i == imposterIndex, hasSeenRole: false, name: "Player \((i + 1))")
+        let existing = players
+        if existing.count == playerCount {
+            players = (0..<playerCount).map { i in
+                let old = existing[i]
+                return Player(index: i + 1, isImposter: i == imposterIndex, hasSeenRole: false, name: old.name, wins: old.wins)
+            }
+        } else {
+            players = (0..<playerCount).map { i in
+                Player(index: i + 1, isImposter: i == imposterIndex, hasSeenRole: false, name: "Player \(i + 1)", wins: 0)
+            }
         }
+        
         if requiresNameEntry, let saved = UserDefaults.standard.array(forKey: ClashImposterEngine.savedNamesKey) as? [String] {
             let count = min(players.count, saved.count)
             for i in 0..<count {
@@ -64,6 +75,23 @@ class ClashImposterEngine: ObservableObject {
         gameState = .setup
         players = []
     }
+    
+    func prepareNextRound() {
+        // If we have players, keep their names and wins, reassign roles and reset per-round flags
+        guard !players.isEmpty else { gameState = .setup; return }
+        let playerCount = players.count
+        let imposterIndex = Int.random(in: 0..<playerCount)
+        secretCard = cardPool.randomElement() ?? "P.E.K.K.A"
+        for i in 0..<playerCount {
+            players[i].isImposter = (i == imposterIndex)
+            players[i].hasSeenRole = false
+        }
+        gameState = .distribution
+    }
+    
+    func resetWins() {
+        for i in players.indices { players[i].wins = 0 }
+    }
 }
 
 // --- 2. MAIN VIEW ---
@@ -71,47 +99,36 @@ struct ContentView: View {
     @StateObject private var engine = ClashImposterEngine()
     @State private var playerCount = 4
     @State private var showRevealScreen = false
-    @AppStorage("timedFlipEnabled") private var timedFlipEnabled: Bool = false // Added @AppStorage toggle
-    @AppStorage("customPlayerNamesEnabled") private var customPlayerNamesEnabled: Bool = false
     
     let clashBlue = Color(red: 0.05, green: 0.1, blue: 0.25)
     let clashGold = Color(red: 1.0, green: 0.8, blue: 0.2)
     
     var body: some View {
-        // --- Changed: Wrap current UI inside a TabView with two tabs: Game and Settings ---
-        TabView {
-            NavigationView {
-                ZStack {
-                    // Premium Arena Background
-                    LinearGradient(gradient: Gradient(colors: [clashBlue, .black]), startPoint: .top, endPoint: .bottom)
-                        .ignoresSafeArea()
-                    
-                    VStack {
-                        if engine.gameState == .setup {
-                            setupView
-                        } else if engine.gameState == .nameEntry {
-                            nameEntryView
-                        } else if engine.gameState == .distribution {
-                            distributionView
-                        } else {
-                            discussionView
-                        }
+        NavigationView {
+            ZStack {
+                // Premium Arena Background
+                LinearGradient(gradient: Gradient(colors: [clashBlue, .black]), startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea()
+                
+                VStack {
+                    if engine.gameState == .setup {
+                        setupView
+                    } else if engine.gameState == .nameEntry {
+                        nameEntryView
+                    } else if engine.gameState == .distribution {
+                        distributionView
+                    } else if engine.gameState == .discussion {
+                        discussionView
+                    } else if engine.gameState == .celebration {
+                        celebrationView
                     }
-                    .padding()
                 }
-                .navigationBarHidden(true)
+                .padding()
             }
-            .tabItem {
-                Label("Game", systemImage: "house")
-            }
-            .preferredColorScheme(.dark)
-            .overlay(revealView)
-            
-            GameSettingsView(timedFlipEnabled: $timedFlipEnabled, customPlayerNamesEnabled: $customPlayerNamesEnabled)
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape")
-                }
+            .navigationBarHidden(true)
         }
+        .preferredColorScheme(.dark)
+        .overlay(revealView)
     }
     
     // --- DESIGNED SETUP SCREEN ---
@@ -167,7 +184,7 @@ struct ContentView: View {
 
             Button(action: {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                engine.startGame(playerCount: playerCount, requiresNameEntry: customPlayerNamesEnabled)
+                engine.startGame(playerCount: playerCount, requiresNameEntry: true)
             }) {
                 Text("ENTER ARENA")
                     .font(.system(size: 22, weight: .black, design: .rounded))
@@ -265,8 +282,8 @@ struct ContentView: View {
                 // REVERTED TO 2 COLUMNS
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
                     ForEach(engine.players.indices, id: \.self) { index in
-                        // --- Changed: Pass timedFlipEnabled to CardFlipView ---
-                        CardFlipView(player: $engine.players[index], secretCard: engine.secretCard, clashGold: clashGold, timedFlipEnabled: timedFlipEnabled)
+                        // --- Changed: Pass timedFlipEnabled always true to CardFlipView ---
+                        CardFlipView(player: $engine.players[index], secretCard: engine.secretCard, clashGold: clashGold, timedFlipEnabled: true)
                             .frame(width: 140, height: 185) // increased size here
                     }
                 }
@@ -310,6 +327,55 @@ struct ContentView: View {
         }
     }
     
+    var celebrationView: some View {
+        ZStack {
+            // Minimalist celebration background
+            LinearGradient(gradient: Gradient(colors: [Color.black, Color(red: 0.1, green: 0.15, blue: 0.3)]), startPoint: .topLeading, endPoint: .bottomTrailing)
+                .ignoresSafeArea()
+                .overlay(
+                    ZStack {
+                        Circle().fill(clashGold.opacity(0.15)).frame(width: 220, height: 220).blur(radius: 40).offset(x: -120, y: -180)
+                        Circle().fill(Color.white.opacity(0.06)).frame(width: 260, height: 260).blur(radius: 50).offset(x: 140, y: 160)
+                    }
+                )
+            VStack(spacing: 24) {
+                Text("🏆").font(.system(size: 54))
+                if engine.recentWinners.count == 1 {
+                    Text("\(engine.recentWinners.first!.name) Won!")
+                        .font(.largeTitle).bold().foregroundColor(clashGold)
+                } else {
+                    VStack(spacing: 8) {
+                        Text("Winners!").font(.title).bold().foregroundColor(clashGold)
+                        ForEach(engine.recentWinners, id: \.id) { p in
+                            Text(p.name).font(.title3).foregroundColor(.white)
+                        }
+                    }
+                }
+                HStack(spacing: 16) {
+                    Button {
+                        // Play again: same players, new roles
+                        engine.prepareNextRound()
+                    } label: {
+                        Text("Play Again").bold().padding(.vertical, 14).padding(.horizontal, 22)
+                    }
+                    .background(RoundedRectangle(cornerRadius: 14).fill(clashGold))
+                    .foregroundColor(.black)
+
+                    Button {
+                        // Edit players: go to setup and reset wins
+                        engine.resetWins()
+                        engine.reset()
+                    } label: {
+                        Text("Edit Players").bold().padding(.vertical, 14).padding(.horizontal, 22)
+                    }
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.15)))
+                    .foregroundColor(.white)
+                }
+            }
+            .padding()
+        }
+    }
+    
     private var revealView: some View {
         Group {
             if showRevealScreen {
@@ -321,6 +387,9 @@ struct ContentView: View {
                         let imposter = engine.players.first(where: { $0.isImposter })
                         if let imposter {
                             VStack(spacing: 10) {
+                                Text("🏆 \(imposter.wins)")
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .foregroundColor(clashGold)
                                 Text(imposter.name).font(.title3).foregroundColor(.red).bold()
                                 Image("Imposter Card").resizable().scaledToFit().frame(height: 90).shadow(radius: 8)
                                 Text("IMPOSTER").font(.headline).foregroundColor(.white)
@@ -331,15 +400,52 @@ struct ContentView: View {
                             HStack(spacing: 18) {
                                 ForEach(engine.players.filter { !$0.isImposter }, id: \.id) { player in
                                     VStack(spacing: 7) {
+                                        Text("🏆 \(player.wins)")
+                                            .font(.caption2).bold()
+                                            .foregroundColor(clashGold)
                                         Image(engine.secretCard).resizable().scaledToFit().frame(height: 70).cornerRadius(8)
                                         Text(player.name).font(.subheadline).foregroundColor(.gray)
                                     }.padding(8).background(RoundedRectangle(cornerRadius: 13).fill(Color.white.opacity(0.13)))
                                 }
                             }
                         }.padding(.horizontal)
-                        Button(action: { showRevealScreen = false; engine.reset() }) {
-                            Text("Start New Game").font(.title3).bold().padding(.vertical, 14).padding(.horizontal, 44).background(RoundedRectangle(cornerRadius: 20).fill(clashGold)).foregroundColor(.black)
-                        }.padding(.top, 14)
+                        
+                        Text("Did the Imposter win?").font(.headline).foregroundColor(.white)
+                        HStack(spacing: 12) {
+                            Button {
+                                // Imposter won: add 1 win to imposter, set recent winners and go to celebration
+                                if let impIndex = engine.players.firstIndex(where: { $0.isImposter }) {
+                                    engine.players[impIndex].wins += 1
+                                    engine.recentWinners = [engine.players[impIndex]]
+                                } else {
+                                    engine.recentWinners = []
+                                }
+                                showRevealScreen = false
+                                engine.gameState = .celebration
+                            } label: {
+                                Text("Imposter Won").bold().padding(.vertical, 12).padding(.horizontal, 16)
+                            }
+                            .background(RoundedRectangle(cornerRadius: 12).fill(Color.red))
+                            .foregroundColor(.white)
+
+                            Button {
+                                // Crew won: add 1 win to everyone except imposter, set recent winners and go to celebration
+                                var winners: [Player] = []
+                                for i in engine.players.indices {
+                                    if !engine.players[i].isImposter {
+                                        engine.players[i].wins += 1
+                                        winners.append(engine.players[i])
+                                    }
+                                }
+                                engine.recentWinners = winners
+                                showRevealScreen = false
+                                engine.gameState = .celebration
+                            } label: {
+                                Text("Crew Won").bold().padding(.vertical, 12).padding(.horizontal, 16)
+                            }
+                            .background(RoundedRectangle(cornerRadius: 12).fill(Color.green))
+                            .foregroundColor(.white)
+                        }
                     }
                     .padding(36)
                 }
@@ -355,7 +461,7 @@ struct CardFlipView: View {
     @Binding var player: Player
     var secretCard: String
     var clashGold: Color
-    var timedFlipEnabled: Bool // Added parameter
+    let timedFlipEnabled: Bool
     
     @State private var degree: Double = 0
     @State private var isFlipped: Bool = false
@@ -371,6 +477,9 @@ struct CardFlipView: View {
                     Image(systemName: "shield.fill")
                         .font(.system(size: 35))
                         .foregroundColor(clashGold)
+                    Text("🏆 \(player.wins)")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundColor(clashGold)
                     Text(player.name.uppercased())
                         .font(.system(size: 14, weight: .black, design: .rounded))
                         .foregroundColor(.white)
@@ -383,6 +492,13 @@ struct CardFlipView: View {
                 ZStack(alignment: .bottom) {
                     if player.isImposter {
                         VStack(spacing: 0) {
+                            HStack {
+                                Text("🏆 \(player.wins)")
+                                    .font(.caption2).bold()
+                                    .foregroundColor(clashGold)
+                                Spacer()
+                            }
+                            .padding(.top, 6)
                             Spacer(minLength: 0)
                             Image("Imposter Card")
                                 .resizable()
@@ -405,6 +521,13 @@ struct CardFlipView: View {
                     }
                     else {
                         VStack(spacing: 0) {
+                            HStack {
+                                Text("🏆 \(player.wins)")
+                                    .font(.caption2).bold()
+                                    .foregroundColor(clashGold)
+                                Spacer()
+                            }
+                            .padding(.top, 6)
                             Spacer(minLength: 0)
                             Image(secretCard)
                                 .resizable()
@@ -536,24 +659,6 @@ struct CardFlipView: View {
             .background(Circle().fill(Color.black.opacity(0.5)))
             .clipShape(Circle())
             .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0)
-        }
-    }
-}
-
-// --- 4. SETTINGS VIEW ---
-struct GameSettingsView: View {
-    @Binding var timedFlipEnabled: Bool
-    @Binding var customPlayerNamesEnabled: Bool
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Game Options")) {
-                    Toggle("Enable Timed Flip (5 sec)", isOn: $timedFlipEnabled)
-                    Toggle("Custom Player Names", isOn: $customPlayerNamesEnabled)
-                }
-            }
-            .navigationTitle("Settings")
         }
     }
 }
