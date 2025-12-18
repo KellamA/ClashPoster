@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 // --- 1. DATA MODELS & LOGIC ---
 struct Player: Identifiable {
@@ -6,12 +7,14 @@ struct Player: Identifiable {
     let index: Int
     var isImposter: Bool = false
     var hasSeenRole: Bool = false
+    var name: String
 }
 
 class ClashImposterEngine: ObservableObject {
     @Published var players: [Player] = []
     @Published var secretCard: String = ""
     @Published var gameState: GameMode = .setup
+    static let savedNamesKey = "savedPlayerNames"
     
     // Ensure these match your Asset names exactly!
     let cardPool = ["Archer Queen", "Archers", "Arrows", "Baby Dragon", "Balloon", "Bandit", "Barbarian Barrel",
@@ -35,17 +38,26 @@ class ClashImposterEngine: ObservableObject {
                         "Vines", "Void", "Wall Breakers", "Witch", "Wizard", "X-Bow", "Zap", "Zappies"]
     
     enum GameMode {
-        case setup, distribution, discussion
+        case setup, nameEntry, distribution, discussion
     }
     
-    func startGame(playerCount: Int) {
+    func startGame(playerCount: Int, requiresNameEntry: Bool) {
         let imposterIndex = Int.random(in: 0..<playerCount)
         secretCard = cardPool.randomElement() ?? "P.E.K.K.A"
         
         players = (0..<playerCount).map { i in
-            Player(index: i + 1, isImposter: i == imposterIndex)
+            Player(index: i + 1, isImposter: i == imposterIndex, hasSeenRole: false, name: "Player \((i + 1))")
         }
-        gameState = .distribution
+        if requiresNameEntry, let saved = UserDefaults.standard.array(forKey: ClashImposterEngine.savedNamesKey) as? [String] {
+            let count = min(players.count, saved.count)
+            for i in 0..<count {
+                let trimmed = saved[i].trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    players[i].name = trimmed
+                }
+            }
+        }
+        gameState = requiresNameEntry ? .nameEntry : .distribution
     }
     
     func reset() {
@@ -59,32 +71,47 @@ struct ContentView: View {
     @StateObject private var engine = ClashImposterEngine()
     @State private var playerCount = 4
     @State private var showRevealScreen = false
+    @AppStorage("timedFlipEnabled") private var timedFlipEnabled: Bool = false // Added @AppStorage toggle
+    @AppStorage("customPlayerNamesEnabled") private var customPlayerNamesEnabled: Bool = false
     
     let clashBlue = Color(red: 0.05, green: 0.1, blue: 0.25)
     let clashGold = Color(red: 1.0, green: 0.8, blue: 0.2)
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                // Premium Arena Background
-                LinearGradient(gradient: Gradient(colors: [clashBlue, .black]), startPoint: .top, endPoint: .bottom)
-                    .ignoresSafeArea()
-                
-                VStack {
-                    if engine.gameState == .setup {
-                        setupView
-                    } else if engine.gameState == .distribution {
-                        distributionView
-                    } else {
-                        discussionView
+        // --- Changed: Wrap current UI inside a TabView with two tabs: Game and Settings ---
+        TabView {
+            NavigationView {
+                ZStack {
+                    // Premium Arena Background
+                    LinearGradient(gradient: Gradient(colors: [clashBlue, .black]), startPoint: .top, endPoint: .bottom)
+                        .ignoresSafeArea()
+                    
+                    VStack {
+                        if engine.gameState == .setup {
+                            setupView
+                        } else if engine.gameState == .nameEntry {
+                            nameEntryView
+                        } else if engine.gameState == .distribution {
+                            distributionView
+                        } else {
+                            discussionView
+                        }
                     }
+                    .padding()
                 }
-                .padding()
+                .navigationBarHidden(true)
             }
-            .navigationBarHidden(true)
+            .tabItem {
+                Label("Game", systemImage: "house")
+            }
+            .preferredColorScheme(.dark)
+            .overlay(revealView)
+            
+            GameSettingsView(timedFlipEnabled: $timedFlipEnabled, customPlayerNamesEnabled: $customPlayerNamesEnabled)
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
+                }
         }
-        .preferredColorScheme(.dark)
-        .overlay(revealView)
     }
     
     // --- DESIGNED SETUP SCREEN ---
@@ -140,7 +167,7 @@ struct ContentView: View {
 
             Button(action: {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                engine.startGame(playerCount: playerCount)
+                engine.startGame(playerCount: playerCount, requiresNameEntry: customPlayerNamesEnabled)
             }) {
                 Text("ENTER ARENA")
                     .font(.system(size: 22, weight: .black, design: .rounded))
@@ -152,6 +179,77 @@ struct ContentView: View {
                     .shadow(color: clashGold.opacity(0.4), radius: 15, x: 0, y: 8)
             }
             .padding(.horizontal, 40).padding(.bottom, 30)
+        }
+    }
+    
+    // --- NAME ENTRY VIEW ---
+    var nameEntryView: some View {
+        VStack(spacing: 20) {
+            Text("ENTER PLAYER NAMES")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(clashGold)
+                .padding(.top, 8)
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    ForEach(engine.players.indices, id: \.self) { index in
+                        HStack(spacing: 12) {
+                            Text("\(index + 1).")
+                                .font(.subheadline).bold()
+                                .foregroundColor(clashGold)
+                                .frame(width: 24, alignment: .trailing)
+
+                            TextField("Player \((index + 1))", text: $engine.players[index].name)
+                                .padding(10)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.08)))
+                                .foregroundColor(.white)
+                                .textInputAutocapitalization(.words)
+                                .disableAutocorrection(true)
+                        }
+                        .padding(.horizontal, 8)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 4)
+            }
+
+            Spacer()
+
+            Button("Reset to Defaults", role: .destructive) {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                // Clear persisted names and reset current fields to defaults
+                UserDefaults.standard.removeObject(forKey: ClashImposterEngine.savedNamesKey)
+                for i in engine.players.indices {
+                    engine.players[i].name = "Player \(i + 1)"
+                }
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
+            .padding(.horizontal, 40)
+            .padding(.bottom, 6)
+
+            Button(action: {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                // Sanitize names: trim whitespace and restore defaults if empty
+                for i in engine.players.indices {
+                    let trimmed = engine.players[i].name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    engine.players[i].name = trimmed.isEmpty ? "Player \(i + 1)" : trimmed
+                }
+                let namesToSave = engine.players.map { $0.name }
+                UserDefaults.standard.set(namesToSave, forKey: ClashImposterEngine.savedNamesKey)
+                engine.gameState = .distribution
+            }) {
+                Text("CONTINUE")
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundColor(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(LinearGradient(gradient: Gradient(colors: [clashGold, Color(red: 0.8, green: 0.6, blue: 0.1)]), startPoint: .top, endPoint: .bottom))
+                    .cornerRadius(16)
+                    .shadow(color: clashGold.opacity(0.4), radius: 12, x: 0, y: 6)
+            }
+            .padding(.horizontal, 40)
+            .padding(.bottom, 10)
         }
     }
     
@@ -167,7 +265,8 @@ struct ContentView: View {
                 // REVERTED TO 2 COLUMNS
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
                     ForEach(engine.players.indices, id: \.self) { index in
-                        CardFlipView(player: $engine.players[index], secretCard: engine.secretCard, clashGold: clashGold)
+                        // --- Changed: Pass timedFlipEnabled to CardFlipView ---
+                        CardFlipView(player: $engine.players[index], secretCard: engine.secretCard, clashGold: clashGold, timedFlipEnabled: timedFlipEnabled)
                             .frame(width: 140, height: 185) // increased size here
                     }
                 }
@@ -222,7 +321,7 @@ struct ContentView: View {
                         let imposter = engine.players.first(where: { $0.isImposter })
                         if let imposter {
                             VStack(spacing: 10) {
-                                Text("Player \(imposter.index)").font(.title3).foregroundColor(.red).bold()
+                                Text(imposter.name).font(.title3).foregroundColor(.red).bold()
                                 Image("Imposter Card").resizable().scaledToFit().frame(height: 90).shadow(radius: 8)
                                 Text("IMPOSTER").font(.headline).foregroundColor(.white)
                             }.padding().background(RoundedRectangle(cornerRadius: 18).fill(Color.red.opacity(0.25)))
@@ -233,7 +332,7 @@ struct ContentView: View {
                                 ForEach(engine.players.filter { !$0.isImposter }, id: \.id) { player in
                                     VStack(spacing: 7) {
                                         Image(engine.secretCard).resizable().scaledToFit().frame(height: 70).cornerRadius(8)
-                                        Text("Player \(player.index)").font(.subheadline).foregroundColor(.gray)
+                                        Text(player.name).font(.subheadline).foregroundColor(.gray)
                                     }.padding(8).background(RoundedRectangle(cornerRadius: 13).fill(Color.white.opacity(0.13)))
                                 }
                             }
@@ -256,10 +355,13 @@ struct CardFlipView: View {
     @Binding var player: Player
     var secretCard: String
     var clashGold: Color
+    var timedFlipEnabled: Bool // Added parameter
     
     @State private var degree: Double = 0
     @State private var isFlipped: Bool = false
     @State private var isLocked: Bool = false
+    @State private var flipTimer: Timer? // Added timer state
+    @State private var remainingProgress: CGFloat = 0 // Progress for visual timer (1 -> 0)
     
     var body: some View {
         ZStack {
@@ -269,7 +371,7 @@ struct CardFlipView: View {
                     Image(systemName: "shield.fill")
                         .font(.system(size: 35))
                         .foregroundColor(clashGold)
-                    Text("PLAYER \(player.index)")
+                    Text(player.name.uppercased())
                         .font(.system(size: 14, weight: .black, design: .rounded))
                         .foregroundColor(.white)
                 }
@@ -341,8 +443,21 @@ struct CardFlipView: View {
         .rotation3DEffect(.degrees(degree), axis: (x: 0, y: 1, z: 0))
         .onTapGesture { flipCard() }
         .disabled(isLocked)
+        .overlay(alignment: .topTrailing) {
+            if timedFlipEnabled && isFlipped && !isLocked {
+                TinyTimerRing(progress: remainingProgress, color: clashGold)
+                    .padding(8)
+            }
+        }
+        .onDisappear {
+            // Invalidate timer when view disappears
+            withAnimation(nil) { remainingProgress = 0 }
+            flipTimer?.invalidate()
+            flipTimer = nil
+        }
     }
     
+    // --- Updated flipCard to support timed flip and locking ---
     func flipCard() {
         if !isFlipped {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -351,12 +466,37 @@ struct CardFlipView: View {
                 isFlipped = true
                 player.hasSeenRole = true
             }
+            // Start timer if timedFlipEnabled is true
+            if timedFlipEnabled {
+                flipTimer?.invalidate()
+                withAnimation(nil) { remainingProgress = 1.0 }
+                withAnimation(.linear(duration: 5)) { remainingProgress = 0.0 }
+                flipTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { _ in
+                    withAnimation(nil) { remainingProgress = 0 }
+                    if isFlipped && !isLocked {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            degree += 180
+                            isFlipped = false
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            isLocked = true
+                        }
+                    }
+                    flipTimer?.invalidate()
+                    flipTimer = nil
+                }
+            }
         } else {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 degree += 180
                 isFlipped = false
             }
+            // Invalidate timer if flipping back manually
+            flipTimer?.invalidate()
+            flipTimer = nil
+            withAnimation(nil) { remainingProgress = 0 }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { isLocked = true }
         }
     }
@@ -377,6 +517,43 @@ struct CardFlipView: View {
                     .strokeBorder(border, lineWidth: 4)
             }
             .clipShape(RoundedRectangle(cornerRadius: 15))
+        }
+    }
+    
+    struct TinyTimerRing: View {
+        var progress: CGFloat
+        var color: Color
+        var body: some View {
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.25), lineWidth: 3)
+                Circle()
+                    .trim(from: 0, to: max(0, min(1, progress)))
+                    .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            .frame(width: 24, height: 24)
+            .background(Circle().fill(Color.black.opacity(0.5)))
+            .clipShape(Circle())
+            .shadow(color: Color.black.opacity(0.4), radius: 1, x: 0, y: 0)
+        }
+    }
+}
+
+// --- 4. SETTINGS VIEW ---
+struct GameSettingsView: View {
+    @Binding var timedFlipEnabled: Bool
+    @Binding var customPlayerNamesEnabled: Bool
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Game Options")) {
+                    Toggle("Enable Timed Flip (5 sec)", isOn: $timedFlipEnabled)
+                    Toggle("Custom Player Names", isOn: $customPlayerNamesEnabled)
+                }
+            }
+            .navigationTitle("Settings")
         }
     }
 }

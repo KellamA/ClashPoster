@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		EA1EBF482EF3777400F9AEA4 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA1EBF472EF3777400F9AEA4 /* SettingsView.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		EA83C4412EF33885005F3A90 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,6 +28,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		EA1EBF472EF3777400F9AEA4 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		EA83C42D2EF33883005F3A90 /* ClashPoster.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClashPoster.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EA83C4402EF33885005F3A90 /* ClashPosterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClashPosterTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EA83C44A2EF33885005F3A90 /* ClashPosterUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClashPosterUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -79,6 +84,7 @@
 				EA83C4432EF33885005F3A90 /* ClashPosterTests */,
 				EA83C44D2EF33885005F3A90 /* ClashPosterUITests */,
 				EA83C42E2EF33883005F3A90 /* Products */,
+				EA1EBF472EF3777400F9AEA4 /* SettingsView.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -236,6 +242,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EA1EBF482EF3777400F9AEA4 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
