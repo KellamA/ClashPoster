@@ -16,6 +16,7 @@ class ClashImposterEngine: ObservableObject {
     @Published var secretCard: String = ""
     @Published var gameState: GameMode = .setup
     @Published var recentWinners: [Player] = []
+    @Published var firstPlayerID: UUID? = nil
     static let savedNamesKey = "savedPlayerNames"
     
     // Ensure these match your Asset names exactly!
@@ -69,6 +70,11 @@ class ClashImposterEngine: ObservableObject {
             }
         }
         gameState = requiresNameEntry ? .nameEntry : .distribution
+        if !requiresNameEntry {
+            firstPlayerID = players.randomElement()?.id
+        } else {
+            firstPlayerID = nil
+        }
     }
     
     func reset() {
@@ -87,6 +93,7 @@ class ClashImposterEngine: ObservableObject {
             players[i].hasSeenRole = false
         }
         gameState = .distribution
+        firstPlayerID = players.randomElement()?.id
     }
     
     func resetWins() {
@@ -255,6 +262,7 @@ struct ContentView: View {
                 let namesToSave = engine.players.map { $0.name }
                 UserDefaults.standard.set(namesToSave, forKey: ClashImposterEngine.savedNamesKey)
                 engine.gameState = .distribution
+                engine.firstPlayerID = engine.players.randomElement()?.id
             }) {
                 Text("CONTINUE")
                     .font(.system(size: 18, weight: .black, design: .rounded))
@@ -312,6 +320,14 @@ struct ContentView: View {
             Text("WHO IS THE IMPOSTER?").font(.title).bold().foregroundColor(clashGold)
             
             Image(systemName: "magnifyingglass").font(.system(size: 80)).foregroundColor(clashGold)
+            
+            if let firstID = engine.firstPlayerID, let first = engine.players.first(where: { $0.id == firstID }) {
+                Text("First to speak: \(first.name)")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding(8)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.1)))
+            }
 
             Text("The Imposter is trying to blend in.\nDescribe the card, find the traitor!")
                 .multilineTextAlignment(.center).padding().background(Color.white.opacity(0.1)).cornerRadius(15)
