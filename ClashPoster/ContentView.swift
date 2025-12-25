@@ -1,8 +1,17 @@
 import SwiftUI
 import Foundation
+import AVFoundation
 
 // Shared warm white color used across the UI
 let warmWhite: Color = Color(red: 1.0, green: 0.96, blue: 0.85)
+
+// Lightweight click sound player (no background music)
+struct SoundPlayer {
+    static var clickID: SystemSoundID = 1105 // softer tap
+    static func playClick() {
+        AudioServicesPlaySystemSound(clickID)
+    }
+}
 
 // Immutable identity + per-round/player state
 struct Player: Identifiable {
@@ -206,6 +215,7 @@ struct ContentView: View {
 
             // Start button -> enters name entry (persisted names auto-fill)
             Button(action: {
+                SoundPlayer.playClick()
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 engine.startGame(playerCount: playerCount)
             }) {
@@ -269,6 +279,7 @@ struct ContentView: View {
 
             // Reset names to defaults and clear persisted storage
             Button("Reset to Defaults", role: .destructive) {
+                SoundPlayer.playClick()
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 // Clear persisted names and reset current fields to defaults
                 UserDefaults.standard.removeObject(forKey: ClashImposterEngine.savedNamesKey)
@@ -283,6 +294,7 @@ struct ContentView: View {
 
             // Continue -> sanitize names, persist to UserDefaults, and move to distribution
             Button(action: {
+                SoundPlayer.playClick()
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 // Sanitize names: trim whitespace and restore defaults if empty
                 for i in engine.players.indices {
@@ -342,7 +354,10 @@ struct ContentView: View {
             
             // Continue only when everyone has seen their role
             if engine.players.allSatisfy({ $0.hasSeenRole }) {
-                Button(action: { engine.gameState = .discussion }) {
+                Button(action: {
+                    SoundPlayer.playClick()
+                    engine.gameState = .discussion
+                }) {
                     Text("BEGIN BATTLE")
                         .font(.headline).bold()
                         .frame(maxWidth: .infinity)
@@ -380,11 +395,15 @@ struct ContentView: View {
             
             // Show reveal overlay
             Button("REVEAL IMPOSTER") {
+                SoundPlayer.playClick()
                 showRevealScreen = true
             }
             .buttonStyle(.borderedProminent).tint(clashGold).foregroundColor(.black)
             
-            Button("New Game") { engine.reset() }.tint(.red)
+            Button("New Game") {
+                SoundPlayer.playClick()
+                engine.reset()
+            }.tint(.red)
         }
     }
     
@@ -418,6 +437,7 @@ struct ContentView: View {
                 HStack(spacing: 16) {
                     // Same players, new roles
                     Button {
+                        SoundPlayer.playClick()
                         // Play again: same players, new roles
                         engine.prepareNextRound()
                     } label: {
@@ -428,6 +448,7 @@ struct ContentView: View {
 
                     // Back to setup and clear wins
                     Button {
+                        SoundPlayer.playClick()
                         // Edit players: go to setup and reset wins
                         engine.resetWins()
                         engine.reset()
@@ -493,6 +514,7 @@ struct ContentView: View {
                         Text("Did the Imposter win?").font(.headline).foregroundColor(.white)
                         HStack(spacing: 12) {
                             Button {
+                                SoundPlayer.playClick()
                                 // Imposter won: add 1 win to imposter, set recent winners and go to celebration
                                 if let impIndex = engine.players.firstIndex(where: { $0.isImposter }) {
                                     engine.players[impIndex].wins += 1
@@ -509,6 +531,7 @@ struct ContentView: View {
                             .foregroundColor(.white)
 
                             Button {
+                                SoundPlayer.playClick()
                                 // Crew won: add 1 win to everyone except imposter, set recent winners and go to celebration
                                 var winners: [Player] = []
                                 for i in engine.players.indices {
@@ -685,6 +708,7 @@ struct CardFlipView: View {
     // --- Updated flipCard to support timed flip and locking ---
     // First tap flips to front; after 5s auto-flips back and locks. Manual flip-back also locks.
     func flipCard() {
+        SoundPlayer.playClick()
         if !isFlipped {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
