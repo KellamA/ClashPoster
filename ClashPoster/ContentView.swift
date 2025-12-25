@@ -1,9 +1,10 @@
 import SwiftUI
 import Foundation
 
+// Shared warm white color used across the UI
 let warmWhite: Color = Color(red: 1.0, green: 0.96, blue: 0.85)
 
-// --- 1. DATA MODELS & LOGIC ---
+// Immutable identity + per-round/player state
 struct Player: Identifiable {
     let id = UUID()
     let index: Int
@@ -13,176 +14,43 @@ struct Player: Identifiable {
     var wins: Int = 0
 }
 
+// Central game engine that drives all state (observable by views)
 class ClashImposterEngine: ObservableObject {
+    // MARK: Persisted game state
     @Published var players: [Player] = []
     @Published var secretCard: String = ""
     @Published var gameState: GameMode = .setup
     @Published var recentWinners: [Player] = []
     @Published var firstPlayerID: UUID? = nil
+    // MARK: Persistence keys
     static let savedNamesKey = "savedPlayerNames"
     static let hintsEnabledKey = "hintsEnabled"
+    // Hints setting (persisted)
     @Published var hintsEnabled: Bool = UserDefaults.standard.bool(forKey: ClashImposterEngine.hintsEnabledKey) {
         didSet { UserDefaults.standard.set(hintsEnabled, forKey: ClashImposterEngine.hintsEnabledKey) }
     }
     
-    // Ensure these match your Asset names exactly!
-    let cardPool = ["Archer Queen", "Archers", "Arrows", "Baby Dragon", "Balloon", "Bandit", "Barbarian Barrel",
-                    "Barbarian Hut", "Barbarians", "Bats", "Battle Healer", "Battle Ram", "Berserker", "Bomb Tower",
-                    "Bomber", "Boss Bandit", "Bowler", "Cannon", "Cannon Cart", "Clone", "Dark Prince", "Dart Goblin",
-                    "Earthquake", "Electro Dragon", "Electro Giant", "Electro Spirit", "Electro Wizard",
-                    "Elite Barbarians", "Elixir Collector", "Elixir Golem", "Executioner", "Fire Spirit",
-                    "Fireball", "Firecracker", "Fisherman", "Flying Machine", "Freeze", "Furnace", "Giant",
-                    "Giant Skeleton", "Giant Snowball", "Goblin Barrel", "Goblin Cage", "Goblin Curse",
-                    "Goblin Demolisher", "Goblin Drill", "Goblin Gang", "Goblin Giant", "Goblin Hut",
-                    "Goblin Machine", "Goblins", "Goblinstein", "Golden Knight", "Golem", "Graveyard",
-                        "Guards", "Heal Spirit", "Hog Rider", "Hunter", "Ice Golem", "Ice Spirit", "Ice Wizard",
-                        "Inferno Dragon", "Inferno Tower", "Knight", "Lava Hound", "Lightning", "Little Prince",
-                        "Lumberjack", "Magic Archer", "Mega Knight", "Mega Minion", "Mighty Miner", "Miner",
-                        "Mini P.E.K.K.A", "Minion Horde", "Minions", "Mirror", "Monk", "Mortar", "Mother Witch",
-                        "Musketeer", "Night Witch", "P.E.K.K.A", "Phoenix", "Poison", "Prince", "Princess",
-                        "Rage", "Ram Rider", "Rascals", "Rocket", "Royal Delivery", "Royal Ghost",
-                        "Royal Giant", "Royal Hogs", "Royal Recruits", "Rune Giant", "Skeleton Army", "Skeleton Barrel",
-                        "Skeleton Dragons", "Skeleton King", "Skeletons", "Sparky", "Spear Goblins", "Spirit Empress",
-                        "Suspicious Bush", "Tesla", "The Log", "Three Musketeers", "Tombstone", "Tornado", "Valkyrie",
-                        "Vines", "Void", "Wall Breakers", "Witch", "Wizard", "X-Bow", "Zap", "Zappies"]
+    // Cards source of truth lives in CardDatabase
+    var cardNames: [String] { CardDatabase.names }
+    func hint(for card: String) -> String? { CardDatabase.hint(for: card) }
     
-    // Hint words for each card. Keep subtle to avoid giving away the answer directly.
-    let cardHints: [String: String] = [
-        "Archer Queen": "invisible",
-        "Archers": "duo",
-        "Arrows": "sky",
-        "Baby Dragon": "splash air",
-        "Balloon": "bomb drop",
-        "Bandit": "dash",
-        "Barbarian Barrel": "roll",
-        "Barbarian Hut": "spawn",
-        "Barbarians": "swarm",
-        "Bats": "cheap air",
-        "Battle Healer": "heal",
-        "Battle Ram": "charge",
-        "Berserker": "rage",
-        "Bomb Tower": "defense splash",
-        "Bomber": "ground splash",
-        "Boss Bandit": "super dash",
-        "Bowler": "push",
-        "Cannon": "cheap defense",
-        "Cannon Cart": "mobile turret",
-        "Clone": "duplicate",
-        "Dark Prince": "splash charge",
-        "Dart Goblin": "long range",
-        "Earthquake": "shake buildings",
-        "Electro Dragon": "chain stun",
-        "Electro Giant": "reflect",
-        "Electro Spirit": "zap chain",
-        "Electro Wizard": "stun on spawn",
-        "Elite Barbarians": "fast duo",
-        "Elixir Collector": "pump",
-        "Elixir Golem": "refund blobs",
-        "Executioner": "boomerang axe",
-        "Fire Spirit": "jump splash",
-        "Fireball": "knockback",
-        "Firecracker": "recoil",
-        "Fisherman": "pull",
-        "Flying Machine": "air turret",
-        "Freeze": "ice stop",
-        "Furnace": "spirit spawner",
-        "Giant": "tank tower",
-        "Giant Skeleton": "death bomb",
-        "Giant Snowball": "slow push",
-        "Goblin Barrel": "surprise back",
-        "Goblin Cage": "brawler",
-        "Goblin Curse": "hex",
-        "Goblin Demolisher": "siege cart",
-        "Goblin Drill": "burrow",
-        "Goblin Gang": "mixed swarm",
-        "Goblin Giant": "spears escort",
-        "Goblin Hut": "spear spawner",
-        "Goblin Machine": "contraption",
-        "Goblins": "stab trio",
-        "Goblinstein": "gob golem",
-        "Golden Knight": "chain dash",
-        "Golem": "split death",
-        "Graveyard": "random spawn",
-        "Guards": "shields",
-        "Heal Spirit": "burst heal",
-        "Hog Rider": "wallbreak jump",
-        "Hunter": "close burst",
-        "Ice Golem": "death slow",
-        "Ice Spirit": "freeze jump",
-        "Ice Wizard": "perma slow",
-        "Inferno Dragon": "ramping beam",
-        "Inferno Tower": "melt beam",
-        "Knight": "cheap tank",
-        "Lava Hound": "pups",
-        "Lightning": "selective strike",
-        "Little Prince": "charge shot",
-        "Lumberjack": "rage drop",
-        "Magic Archer": "pierce line",
-        "Mega Knight": "spawn slam",
-        "Mega Minion": "heavy air",
-        "Mighty Miner": "tunnel swap",
-        "Miner": "burrow back",
-        "Mini P.E.K.K.A": "pancakes",
-        "Minion Horde": "air swarm",
-        "Minions": "air trio",
-        "Mirror": "repeat higher",
-        "Monk": "reflect palms",
-        "Mortar": "siege arc",
-        "Mother Witch": "cursed hogs",
-        "Musketeer": "single shot",
-        "Night Witch": "bat spawn",
-        "P.E.K.K.A": "heavy hit",
-        "Phoenix": "rebirth egg",
-        "Poison": "slow melt",
-        "Prince": "lance charge",
-        "Princess": "long splash",
-        "Rage": "speed up",
-        "Ram Rider": "snare",
-        "Rascals": "trio split",
-        "Rocket": "big boom",
-        "Royal Delivery": "drop troop",
-        "Royal Ghost": "invisible swing",
-        "Royal Giant": "longshot tower",
-        "Royal Hogs": "lane split",
-        "Royal Recruits": "six split",
-        "Rune Giant": "mystic smash",
-        "Skeleton Army": "bone swarm",
-        "Skeleton Barrel": "drop swarm",
-        "Skeleton Dragons": "twin air",
-        "Skeleton King": "soul summon",
-        "Skeletons": "cycle bones",
-        "Sparky": "charge blast",
-        "Spear Goblins": "poke range",
-        "Spirit Empress": "ethereal",
-        "Suspicious Bush": "ambush",
-        "Tesla": "pop up",
-        "The Log": "roll push",
-        "Three Musketeers": "triple shot",
-        "Tombstone": "on-death bones",
-        "Tornado": "group pull",
-        "Valkyrie": "spin",
-        "Vines": "entangle",
-        "Void": "nullify",
-        "Wall Breakers": "suicide run",
-        "Witch": "skeleton spawn",
-        "Wizard": "splash fire",
-        "X-Bow": "siege lock",
-        "Zap": "instant stun",
-        "Zappies": "stagger stun"
-    ]
-
-    func hint(for card: String) -> String? {
-        return cardHints[card]
+    // Randomly pick a secret card; fallback ensures a valid default
+    private func randomSecretCard() -> String {
+        CardDatabase.names.randomElement() ?? "P.E.K.K.A"
     }
     
+    // All possible screens/modes of the game
     enum GameMode {
         case setup, nameEntry, distribution, discussion, celebration
     }
     
+    // Start a new game with playerCount players.
+    // If requiresNameEntry is true, go to name input; else go straight to distribution.
     func startGame(playerCount: Int, requiresNameEntry: Bool) {
         let imposterIndex = Int.random(in: 0..<playerCount)
-        secretCard = cardPool.randomElement() ?? "P.E.K.K.A"
+        secretCard = randomSecretCard()
         
+        // Reuse existing names/wins if counts match; else initialize fresh players
         let existing = players
         if existing.count == playerCount {
             players = (0..<playerCount).map { i in
@@ -195,6 +63,7 @@ class ClashImposterEngine: ObservableObject {
             }
         }
         
+        // If we’re doing name entry, prefill from UserDefaults when available
         if requiresNameEntry, let saved = UserDefaults.standard.array(forKey: ClashImposterEngine.savedNamesKey) as? [String] {
             let count = min(players.count, saved.count)
             for i in 0..<count {
@@ -204,6 +73,7 @@ class ClashImposterEngine: ObservableObject {
                 }
             }
         }
+        // Move to appropriate next state and set the first speaker when skipping name entry
         gameState = requiresNameEntry ? .nameEntry : .distribution
         if !requiresNameEntry {
             firstPlayerID = players.randomElement()?.id
@@ -212,17 +82,19 @@ class ClashImposterEngine: ObservableObject {
         }
     }
     
+    // Return to setup and clear players (keeps settings like hints)
     func reset() {
         gameState = .setup
         players = []
     }
     
+    // Keep names and wins; reassign roles and secret card for the next round
     func prepareNextRound() {
         // If we have players, keep their names and wins, reassign roles and reset per-round flags
         guard !players.isEmpty else { gameState = .setup; return }
         let playerCount = players.count
         let imposterIndex = Int.random(in: 0..<playerCount)
-        secretCard = cardPool.randomElement() ?? "P.E.K.K.A"
+        secretCard = randomSecretCard()
         for i in 0..<playerCount {
             players[i].isImposter = (i == imposterIndex)
             players[i].hasSeenRole = false
@@ -231,12 +103,14 @@ class ClashImposterEngine: ObservableObject {
         firstPlayerID = players.randomElement()?.id
     }
     
+    // Reset wins but keep players
     func resetWins() {
         for i in players.indices { players[i].wins = 0 }
     }
 }
 
 // --- 2. MAIN VIEW ---
+// Hosts the entire app UI with a TabView (Game + Settings)
 struct ContentView: View {
     @StateObject private var engine = ClashImposterEngine()
     @State private var playerCount = 4
@@ -250,14 +124,17 @@ struct ContentView: View {
     
     var body: some View {
         TabView {
+            // GAME TAB
             NavigationView {
                 ZStack {
+                    // Rich dark gradient background
                     LinearGradient(gradient: Gradient(colors: [
                         Color(red: 0.02, green: 0.08, blue: 0.25),
                         Color(red: 0.00, green: 0.02, blue: 0.12)
                     ]), startPoint: .top, endPoint: .bottom)
                     .ignoresSafeArea()
 
+                    // Screen router based on engine.gameState
                     VStack {
                         if engine.gameState == .setup {
                             setupView
@@ -277,17 +154,18 @@ struct ContentView: View {
             }
             .tabItem { Label("Game", systemImage: "gamecontroller") }
 
-            settingsView
+            AppSettingsView()
+                .environmentObject(engine)
                 .tabItem { Label("Settings", systemImage: "gear") }
         }
         .preferredColorScheme(.dark)
-        .overlay(revealView)
+        .overlay(revealView) // Global overlay used to present the imposter reveal modal
     }
     
     // --- DESIGNED SETUP SCREEN ---
     var setupView: some View {
             VStack(spacing: 40) {
-                // THE NEW COMBINED TITLE
+                // Title
                 HStack(spacing: 0) {
                     Text("CLASH")
                         .font(.system(size: 38, weight: .black, design: .rounded))
@@ -300,6 +178,7 @@ struct ContentView: View {
                 }
                 .padding(.top, 40)
                 
+            // Decorative emblem
             ZStack {
                 Circle()
                     .fill(clashGold.opacity(0.15))
@@ -312,6 +191,7 @@ struct ContentView: View {
                     .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 5)
             }
 
+            // Player count control
             VStack(spacing: 15) {
                 Text("CHOOSE CLAN SIZE")
                     .font(.caption).fontWeight(.bold).foregroundColor(.white.opacity(0.6))
@@ -335,6 +215,7 @@ struct ContentView: View {
             
             Spacer()
 
+            // Start button -> enters name entry (persisted names auto-fill)
             Button(action: {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 engine.startGame(playerCount: playerCount, requiresNameEntry: true)
@@ -344,6 +225,7 @@ struct ContentView: View {
                     .foregroundColor(.white)
                     .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
                     .overlay(
+                        // Faux outline effect to make the text pop
                         Text("ENTER ARENA")
                             .font(.system(size: 22, weight: .black, design: .rounded))
                             .foregroundColor(.clear)
@@ -370,6 +252,7 @@ struct ContentView: View {
                 .foregroundColor(clashGold)
                 .padding(.top, 8)
 
+            // Editable rows of names
             ScrollView {
                 VStack(spacing: 12) {
                     ForEach(engine.players.indices, id: \.self) { index in
@@ -395,6 +278,7 @@ struct ContentView: View {
 
             Spacer()
 
+            // Reset names to defaults and clear persisted storage
             Button("Reset to Defaults", role: .destructive) {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 // Clear persisted names and reset current fields to defaults
@@ -408,6 +292,7 @@ struct ContentView: View {
             .padding(.horizontal, 40)
             .padding(.bottom, 6)
 
+            // Continue -> sanitize names, persist to UserDefaults, and move to distribution
             Button(action: {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 // Sanitize names: trim whitespace and restore defaults if empty
@@ -425,6 +310,7 @@ struct ContentView: View {
                     .foregroundColor(.white)
                     .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
                     .overlay(
+                        // Faux outline for legibility
                         Text("CONTINUE")
                             .font(.system(size: 18, weight: .black, design: .rounded))
                             .foregroundColor(.clear)
@@ -452,12 +338,11 @@ struct ContentView: View {
                 .foregroundColor(clashGold)
                 .padding(.top)
             
+            // Grid of flip cards
             ScrollView {
-                // REVERTED TO 2 COLUMNS
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
                     ForEach(engine.players.indices, id: \.self) { index in
-                        // --- Changed: Pass timedFlipEnabled always true to CardFlipView ---
-                        CardFlipView(player: $engine.players[index], secretCard: engine.secretCard, clashGold: clashGold, timedFlipEnabled: true)
+                        CardFlipView(player: $engine.players[index], secretCard: engine.secretCard, clashGold: clashGold, timedFlipEnabled: true) // Auto flip-back + lock after 5s
                             .frame(width: 140, height: 185)
                             .environmentObject(engine)
                     }
@@ -466,6 +351,7 @@ struct ContentView: View {
                 .padding(.top, 10)
             }
             
+            // Continue only when everyone has seen their role
             if engine.players.allSatisfy({ $0.hasSeenRole }) {
                 Button(action: { engine.gameState = .discussion }) {
                     Text("BEGIN BATTLE")
@@ -488,6 +374,7 @@ struct ContentView: View {
             
             Image(systemName: "magnifyingglass").font(.system(size: 80)).foregroundColor(clashGold)
             
+            // Randomly selected first speaker (set earlier)
             if let firstID = engine.firstPlayerID, let first = engine.players.first(where: { $0.id == firstID }) {
                 Text("First to speak: \(first.name)")
                     .font(.headline)
@@ -502,6 +389,7 @@ struct ContentView: View {
             
             Spacer()
             
+            // Show reveal overlay
             Button("REVEAL IMPOSTER") {
                 showRevealScreen = true
             }
@@ -513,7 +401,7 @@ struct ContentView: View {
     
     var celebrationView: some View {
         ZStack {
-            // Replaced CheckerboardBackground with super dark blue vertical gradient
+            // Gradient + soft circles for atmosphere
             LinearGradient(gradient: Gradient(colors: [
                 Color(red: 0.02, green: 0.08, blue: 0.25),
                 Color(red: 0.00, green: 0.02, blue: 0.12)
@@ -539,6 +427,7 @@ struct ContentView: View {
                     }
                 }
                 HStack(spacing: 16) {
+                    // Same players, new roles
                     Button {
                         // Play again: same players, new roles
                         engine.prepareNextRound()
@@ -548,6 +437,7 @@ struct ContentView: View {
                     .background(RoundedRectangle(cornerRadius: 14).fill(clashGold))
                     .foregroundColor(.black)
 
+                    // Back to setup and clear wins
                     Button {
                         // Edit players: go to setup and reset wins
                         engine.resetWins()
@@ -563,39 +453,9 @@ struct ContentView: View {
         }
     }
     
-    var settingsView: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Hints")) {
-                    Toggle(isOn: $engine.hintsEnabled) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Enable hint words for Imposter")
-                            Text("Subtle one-word hints to assist the Imposter.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
 
-                if engine.hintsEnabled {
-                    Section(header: Text("Current Card Hint Preview")) {
-                        HStack {
-                            Text("Card")
-                            Spacer()
-                            Text(engine.secretCard).foregroundColor(.secondary)
-                        }
-                        HStack {
-                            Text("Hint")
-                            Spacer()
-                            Text(engine.hint(for: engine.secretCard) ?? "—").foregroundColor(.secondary)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Settings")
-        }
-    }
-    
+    // --- IMPOSTER REVEAL OVERLAY ---
+    // Modal overlay showing the imposter and hint (if enabled)
     private var revealView: some View {
         Group {
             if showRevealScreen {
@@ -604,6 +464,7 @@ struct ContentView: View {
                     VStack(spacing: 28) {
                         Text("IMPOSTER REVEAL")
                             .font(.largeTitle).bold().foregroundColor(clashGold)
+                        // Find the imposter to display
                         let imposter = engine.players.first(where: { $0.isImposter })
                         if let imposter {
                             VStack(spacing: 10) {
@@ -623,6 +484,7 @@ struct ContentView: View {
                                 Text("IMPOSTER").font(.headline).foregroundColor(.white)
                             }.padding().background(RoundedRectangle(cornerRadius: 18).fill(Color.red.opacity(0.25)))
                         }
+                        // Show other players' card art for context
                         Text("Other Players' Cards:").font(.headline).foregroundColor(.white)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 18) {
@@ -638,6 +500,7 @@ struct ContentView: View {
                             }
                         }.padding(.horizontal)
                         
+                        // Tally winners and navigate to celebration
                         Text("Did the Imposter win?").font(.headline).foregroundColor(.white)
                         HStack(spacing: 12) {
                             Button {
@@ -678,14 +541,16 @@ struct ContentView: View {
                     .padding(36)
                 }
                 .transition(.opacity)
-                .zIndex(10)
+                .zIndex(10) // Ensure overlay sits above everything
             }
         }
     }
 }
 
 // --- 3. THE 3D CARD FLIP COMPONENT ---
+// Handles flip animation, timed auto-hide, and lockout per player card
 struct CardFlipView: View {
+    // MARK: Bindings & Inputs
     @Binding var player: Player
     var secretCard: String
     var clashGold: Color
@@ -693,6 +558,7 @@ struct CardFlipView: View {
     
     @EnvironmentObject private var engine: ClashImposterEngine
     
+    // MARK: Flip state
     @State private var degree: Double = 0
     @State private var isFlipped: Bool = false
     @State private var isLocked: Bool = false
@@ -701,7 +567,7 @@ struct CardFlipView: View {
     
     var body: some View {
         ZStack {
-            // BACK FACE
+            // BACK FACE (default)
             CardFace(color: Color(red: 0.1, green: 0.2, blue: 0.4), border: clashGold) {
                 VStack(spacing: 8) {
                     Image(systemName: "shield.fill")
@@ -717,7 +583,7 @@ struct CardFlipView: View {
             }
             .opacity(isFlipped ? 0 : 1)
             
-            // FRONT FACE (LARGE IMAGE WITH DARK NAMEPLATE)
+            // FRONT FACE (shows secret or imposter card)
             CardFace(color: .white, border: .red) {
                 ZStack(alignment: .bottom) {
                     if player.isImposter {
@@ -736,6 +602,7 @@ struct CardFlipView: View {
                                 .scaledToFit()
                                 .frame(height: 108)
                                 .cornerRadius(5)
+                            // Imposter-only hint (if enabled)
                             if engine.hintsEnabled, let hint = engine.hint(for: secretCard) {
                                 Text("HINT: \(hint.uppercased())")
                                     .font(.system(size: 10, weight: .black, design: .rounded))
@@ -773,8 +640,9 @@ struct CardFlipView: View {
                             Image(secretCard)
                                 .resizable()
                                 .scaledToFit()
-                                .frame(height: 110) // changed from 90 to 110
+                                .frame(height: 110)
                                 .cornerRadius(5)
+                            // Crew front: shows the secret card art + label
                             Spacer(minLength: 0)
                             Text(secretCard.uppercased())
                                 .font(.system(size: 11, weight: .black, design: .rounded))
@@ -794,6 +662,7 @@ struct CardFlipView: View {
             .opacity(isFlipped ? 1 : 0)
             .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
             
+            // Lock overlay prevents re-flipping after viewing
             if isLocked {
                 RoundedRectangle(cornerRadius: 15)
                     .fill(Color.black.opacity(0.85))
@@ -810,13 +679,14 @@ struct CardFlipView: View {
         .onTapGesture { flipCard() }
         .disabled(isLocked)
         .overlay(alignment: .topTrailing) {
+            // Animated 5s ring shown while front is visible
             if timedFlipEnabled && isFlipped && !isLocked {
                 TinyTimerRing(progress: remainingProgress, color: clashGold)
                     .padding(8)
             }
         }
         .onDisappear {
-            // Invalidate timer when view disappears
+            // Ensure timers and animations are stopped when view leaves screen
             withAnimation(nil) { remainingProgress = 0 }
             flipTimer?.invalidate()
             flipTimer = nil
@@ -824,6 +694,7 @@ struct CardFlipView: View {
     }
     
     // --- Updated flipCard to support timed flip and locking ---
+    // First tap flips to front; after 5s auto-flips back and locks. Manual flip-back also locks.
     func flipCard() {
         if !isFlipped {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -841,10 +712,12 @@ struct CardFlipView: View {
                     withAnimation(nil) { remainingProgress = 0 }
                     if isFlipped && !isLocked {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        // Auto flip back
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                             degree += 180
                             isFlipped = false
                         }
+                        // Lock shortly after the flip finishes
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                             isLocked = true
                         }
@@ -855,6 +728,7 @@ struct CardFlipView: View {
             }
         } else {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            // Manual flip back (user taps again) -> then lock
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 degree += 180
                 isFlipped = false
@@ -868,6 +742,7 @@ struct CardFlipView: View {
     }
     
     
+    // MARK: - Card visual building blocks
     // Helper view for Card Faces
     struct CardFace<Content: View>: View {
         let color: Color
@@ -906,7 +781,8 @@ struct CardFlipView: View {
     }
 }
 
-// New reusable checkerboard background view
+// New reusable checkerboard background view (not currently used on main screens)
+// Left in case you want to reintroduce the style later.
 struct CheckerboardBackground: View {
     let color1: Color
     let color2: Color

@@ -1,17 +1,16 @@
 import SwiftUI
 
-struct SettingsView: View {
-    @AppStorage("timedFlipEnabled") private var timedFlipEnabled: Bool = false
-    
+struct AppSettingsView: View {
+    @EnvironmentObject private var engine: ClashImposterEngine
+
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Role Card")) {
-                    Toggle(isOn: $timedFlipEnabled) {
-                        VStack(alignment: .leading) {
-                            Text("Timed Flip")
-                                .fontWeight(.bold)
-                            Text("Automatically flip your role card back after 5 seconds, so others don't see it!")
+                Section(header: Text("Hints")) {
+                    Toggle(isOn: $engine.hintsEnabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Enable hint words for Imposter")
+                            Text("Subtle one-word hints to assist the Imposter.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -24,5 +23,5 @@ struct SettingsView: View {
 }
 
 #Preview {
-    SettingsView()
+    AppSettingsView().environmentObject(ClashImposterEngine())
 }
