@@ -30,8 +30,6 @@ class ClashImposterEngine: ObservableObject {
         didSet { UserDefaults.standard.set(hintsEnabled, forKey: ClashImposterEngine.hintsEnabledKey) }
     }
     
-    // Cards source of truth lives in CardDatabase
-    var cardNames: [String] { CardDatabase.names }
     func hint(for card: String) -> String? { CardDatabase.hint(for: card) }
     
     // Randomly pick a secret card; fallback ensures a valid default
@@ -45,8 +43,7 @@ class ClashImposterEngine: ObservableObject {
     }
     
     // Start a new game with playerCount players.
-    // If requiresNameEntry is true, go to name input; else go straight to distribution.
-    func startGame(playerCount: Int, requiresNameEntry: Bool) {
+    func startGame(playerCount: Int) {
         let imposterIndex = Int.random(in: 0..<playerCount)
         secretCard = randomSecretCard()
         
@@ -63,8 +60,8 @@ class ClashImposterEngine: ObservableObject {
             }
         }
         
-        // If we’re doing name entry, prefill from UserDefaults when available
-        if requiresNameEntry, let saved = UserDefaults.standard.array(forKey: ClashImposterEngine.savedNamesKey) as? [String] {
+        // Prefill from UserDefaults when available
+        if let saved = UserDefaults.standard.array(forKey: ClashImposterEngine.savedNamesKey) as? [String] {
             let count = min(players.count, saved.count)
             for i in 0..<count {
                 let trimmed = saved[i].trimmingCharacters(in: .whitespacesAndNewlines)
@@ -73,13 +70,9 @@ class ClashImposterEngine: ObservableObject {
                 }
             }
         }
-        // Move to appropriate next state and set the first speaker when skipping name entry
-        gameState = requiresNameEntry ? .nameEntry : .distribution
-        if !requiresNameEntry {
-            firstPlayerID = players.randomElement()?.id
-        } else {
-            firstPlayerID = nil
-        }
+        // Move to name entry screen and reset first player ID
+        gameState = .nameEntry
+        firstPlayerID = nil
     }
     
     // Return to setup and clear players (keeps settings like hints)
@@ -116,11 +109,7 @@ struct ContentView: View {
     @State private var playerCount = 4
     @State private var showRevealScreen = false
     
-    let clashBlue = Color(red: 0.05, green: 0.1, blue: 0.25)
     let clashGold = Color(red: 1.0, green: 0.8, blue: 0.2)
-    let lightBlue = Color(red: 0.40, green: 0.60, blue: 0.95)
-    let darkBlue = Color(red: 0.12, green: 0.22, blue: 0.55)
-    // Removed duplicate warmWhite definition here
     
     var body: some View {
         TabView {
@@ -218,7 +207,7 @@ struct ContentView: View {
             // Start button -> enters name entry (persisted names auto-fill)
             Button(action: {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                engine.startGame(playerCount: playerCount, requiresNameEntry: true)
+                engine.startGame(playerCount: playerCount)
             }) {
                 Text("ENTER ARENA")
                     .font(.system(size: 22, weight: .black, design: .rounded))
@@ -344,11 +333,11 @@ struct ContentView: View {
                     ForEach(engine.players.indices, id: \.self) { index in
                         CardFlipView(player: $engine.players[index], secretCard: engine.secretCard, clashGold: clashGold, timedFlipEnabled: true) // Auto flip-back + lock after 5s
                             .frame(width: 140, height: 185)
-                            .environmentObject(engine)
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
+                .environmentObject(engine)
             }
             
             // Continue only when everyone has seen their role
