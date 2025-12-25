@@ -20,6 +20,10 @@ class ClashImposterEngine: ObservableObject {
     @Published var recentWinners: [Player] = []
     @Published var firstPlayerID: UUID? = nil
     static let savedNamesKey = "savedPlayerNames"
+    static let hintsEnabledKey = "hintsEnabled"
+    @Published var hintsEnabled: Bool = UserDefaults.standard.bool(forKey: ClashImposterEngine.hintsEnabledKey) {
+        didSet { UserDefaults.standard.set(hintsEnabled, forKey: ClashImposterEngine.hintsEnabledKey) }
+    }
     
     // Ensure these match your Asset names exactly!
     let cardPool = ["Archer Queen", "Archers", "Arrows", "Baby Dragon", "Balloon", "Bandit", "Barbarian Barrel",
@@ -41,6 +45,135 @@ class ClashImposterEngine: ObservableObject {
                         "Skeleton Dragons", "Skeleton King", "Skeletons", "Sparky", "Spear Goblins", "Spirit Empress",
                         "Suspicious Bush", "Tesla", "The Log", "Three Musketeers", "Tombstone", "Tornado", "Valkyrie",
                         "Vines", "Void", "Wall Breakers", "Witch", "Wizard", "X-Bow", "Zap", "Zappies"]
+    
+    // Hint words for each card. Keep subtle to avoid giving away the answer directly.
+    let cardHints: [String: String] = [
+        "Archer Queen": "invisible",
+        "Archers": "duo",
+        "Arrows": "sky",
+        "Baby Dragon": "splash air",
+        "Balloon": "bomb drop",
+        "Bandit": "dash",
+        "Barbarian Barrel": "roll",
+        "Barbarian Hut": "spawn",
+        "Barbarians": "swarm",
+        "Bats": "cheap air",
+        "Battle Healer": "heal",
+        "Battle Ram": "charge",
+        "Berserker": "rage",
+        "Bomb Tower": "defense splash",
+        "Bomber": "ground splash",
+        "Boss Bandit": "super dash",
+        "Bowler": "push",
+        "Cannon": "cheap defense",
+        "Cannon Cart": "mobile turret",
+        "Clone": "duplicate",
+        "Dark Prince": "splash charge",
+        "Dart Goblin": "long range",
+        "Earthquake": "shake buildings",
+        "Electro Dragon": "chain stun",
+        "Electro Giant": "reflect",
+        "Electro Spirit": "zap chain",
+        "Electro Wizard": "stun on spawn",
+        "Elite Barbarians": "fast duo",
+        "Elixir Collector": "pump",
+        "Elixir Golem": "refund blobs",
+        "Executioner": "boomerang axe",
+        "Fire Spirit": "jump splash",
+        "Fireball": "knockback",
+        "Firecracker": "recoil",
+        "Fisherman": "pull",
+        "Flying Machine": "air turret",
+        "Freeze": "ice stop",
+        "Furnace": "spirit spawner",
+        "Giant": "tank tower",
+        "Giant Skeleton": "death bomb",
+        "Giant Snowball": "slow push",
+        "Goblin Barrel": "surprise back",
+        "Goblin Cage": "brawler",
+        "Goblin Curse": "hex",
+        "Goblin Demolisher": "siege cart",
+        "Goblin Drill": "burrow",
+        "Goblin Gang": "mixed swarm",
+        "Goblin Giant": "spears escort",
+        "Goblin Hut": "spear spawner",
+        "Goblin Machine": "contraption",
+        "Goblins": "stab trio",
+        "Goblinstein": "gob golem",
+        "Golden Knight": "chain dash",
+        "Golem": "split death",
+        "Graveyard": "random spawn",
+        "Guards": "shields",
+        "Heal Spirit": "burst heal",
+        "Hog Rider": "wallbreak jump",
+        "Hunter": "close burst",
+        "Ice Golem": "death slow",
+        "Ice Spirit": "freeze jump",
+        "Ice Wizard": "perma slow",
+        "Inferno Dragon": "ramping beam",
+        "Inferno Tower": "melt beam",
+        "Knight": "cheap tank",
+        "Lava Hound": "pups",
+        "Lightning": "selective strike",
+        "Little Prince": "charge shot",
+        "Lumberjack": "rage drop",
+        "Magic Archer": "pierce line",
+        "Mega Knight": "spawn slam",
+        "Mega Minion": "heavy air",
+        "Mighty Miner": "tunnel swap",
+        "Miner": "burrow back",
+        "Mini P.E.K.K.A": "pancakes",
+        "Minion Horde": "air swarm",
+        "Minions": "air trio",
+        "Mirror": "repeat higher",
+        "Monk": "reflect palms",
+        "Mortar": "siege arc",
+        "Mother Witch": "cursed hogs",
+        "Musketeer": "single shot",
+        "Night Witch": "bat spawn",
+        "P.E.K.K.A": "heavy hit",
+        "Phoenix": "rebirth egg",
+        "Poison": "slow melt",
+        "Prince": "lance charge",
+        "Princess": "long splash",
+        "Rage": "speed up",
+        "Ram Rider": "snare",
+        "Rascals": "trio split",
+        "Rocket": "big boom",
+        "Royal Delivery": "drop troop",
+        "Royal Ghost": "invisible swing",
+        "Royal Giant": "longshot tower",
+        "Royal Hogs": "lane split",
+        "Royal Recruits": "six split",
+        "Rune Giant": "mystic smash",
+        "Skeleton Army": "bone swarm",
+        "Skeleton Barrel": "drop swarm",
+        "Skeleton Dragons": "twin air",
+        "Skeleton King": "soul summon",
+        "Skeletons": "cycle bones",
+        "Sparky": "charge blast",
+        "Spear Goblins": "poke range",
+        "Spirit Empress": "ethereal",
+        "Suspicious Bush": "ambush",
+        "Tesla": "pop up",
+        "The Log": "roll push",
+        "Three Musketeers": "triple shot",
+        "Tombstone": "on-death bones",
+        "Tornado": "group pull",
+        "Valkyrie": "spin",
+        "Vines": "entangle",
+        "Void": "nullify",
+        "Wall Breakers": "suicide run",
+        "Witch": "skeleton spawn",
+        "Wizard": "splash fire",
+        "X-Bow": "siege lock",
+        "Zap": "instant stun",
+        "Zappies": "stagger stun"
+    ]
+
+    func hint(for card: String) -> String? {
+        return cardHints[card]
+    }
     
     enum GameMode {
         case setup, nameEntry, distribution, discussion, celebration
@@ -116,31 +249,36 @@ struct ContentView: View {
     // Removed duplicate warmWhite definition here
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                // Replaced CheckerboardBackground with super dark blue vertical gradient
-                LinearGradient(gradient: Gradient(colors: [
-                    Color(red: 0.02, green: 0.08, blue: 0.25), // top richer blue
-                    Color(red: 0.00, green: 0.02, blue: 0.12)  // bottom deep blue
-                ]), startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-                
-                VStack {
-                    if engine.gameState == .setup {
-                        setupView
-                    } else if engine.gameState == .nameEntry {
-                        nameEntryView
-                    } else if engine.gameState == .distribution {
-                        distributionView
-                    } else if engine.gameState == .discussion {
-                        discussionView
-                    } else if engine.gameState == .celebration {
-                        celebrationView
+        TabView {
+            NavigationView {
+                ZStack {
+                    LinearGradient(gradient: Gradient(colors: [
+                        Color(red: 0.02, green: 0.08, blue: 0.25),
+                        Color(red: 0.00, green: 0.02, blue: 0.12)
+                    ]), startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea()
+
+                    VStack {
+                        if engine.gameState == .setup {
+                            setupView
+                        } else if engine.gameState == .nameEntry {
+                            nameEntryView
+                        } else if engine.gameState == .distribution {
+                            distributionView
+                        } else if engine.gameState == .discussion {
+                            discussionView
+                        } else if engine.gameState == .celebration {
+                            celebrationView
+                        }
                     }
+                    .padding()
                 }
-                .padding()
+                .navigationBarHidden(true)
             }
-            .navigationBarHidden(true)
+            .tabItem { Label("Game", systemImage: "gamecontroller") }
+
+            settingsView
+                .tabItem { Label("Settings", systemImage: "gear") }
         }
         .preferredColorScheme(.dark)
         .overlay(revealView)
@@ -320,7 +458,8 @@ struct ContentView: View {
                     ForEach(engine.players.indices, id: \.self) { index in
                         // --- Changed: Pass timedFlipEnabled always true to CardFlipView ---
                         CardFlipView(player: $engine.players[index], secretCard: engine.secretCard, clashGold: clashGold, timedFlipEnabled: true)
-                            .frame(width: 140, height: 185) // increased size here
+                            .frame(width: 140, height: 185)
+                            .environmentObject(engine)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -424,6 +563,39 @@ struct ContentView: View {
         }
     }
     
+    var settingsView: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Hints")) {
+                    Toggle(isOn: $engine.hintsEnabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Enable hint words for Imposter")
+                            Text("Subtle one-word hints to assist the Imposter.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                if engine.hintsEnabled {
+                    Section(header: Text("Current Card Hint Preview")) {
+                        HStack {
+                            Text("Card")
+                            Spacer()
+                            Text(engine.secretCard).foregroundColor(.secondary)
+                        }
+                        HStack {
+                            Text("Hint")
+                            Spacer()
+                            Text(engine.hint(for: engine.secretCard) ?? "—").foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Settings")
+        }
+    }
+    
     private var revealView: some View {
         Group {
             if showRevealScreen {
@@ -440,6 +612,14 @@ struct ContentView: View {
                                     .foregroundColor(clashGold)
                                 Text(imposter.name).font(.title3).foregroundColor(.red).bold()
                                 Image("Imposter Card").resizable().scaledToFit().frame(height: 90).shadow(radius: 8)
+                                if engine.hintsEnabled, let hint = engine.hint(for: engine.secretCard) {
+                                    Text("HINT: \(hint.uppercased())")
+                                        .font(.caption).bold()
+                                        .foregroundColor(.white)
+                                        .padding(.vertical, 4)
+                                        .padding(.horizontal, 10)
+                                        .background(Capsule().fill(Color.black.opacity(0.6)))
+                                }
                                 Text("IMPOSTER").font(.headline).foregroundColor(.white)
                             }.padding().background(RoundedRectangle(cornerRadius: 18).fill(Color.red.opacity(0.25)))
                         }
@@ -511,6 +691,8 @@ struct CardFlipView: View {
     var clashGold: Color
     let timedFlipEnabled: Bool
     
+    @EnvironmentObject private var engine: ClashImposterEngine
+    
     @State private var degree: Double = 0
     @State private var isFlipped: Bool = false
     @State private var isLocked: Bool = false
@@ -554,6 +736,15 @@ struct CardFlipView: View {
                                 .scaledToFit()
                                 .frame(height: 108)
                                 .cornerRadius(5)
+                            if engine.hintsEnabled, let hint = engine.hint(for: secretCard) {
+                                Text("HINT: \(hint.uppercased())")
+                                    .font(.system(size: 10, weight: .black, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 4)
+                                    .padding(.horizontal, 12)
+                                    .background(Capsule().fill(Color.black.opacity(0.6)))
+                                    .padding(.top, 6)
+                            }
                             Spacer(minLength: 0)
                             Text("IMPOSTER")
                                 .font(.system(size: 13, weight: .black, design: .rounded))
